@@ -1,0 +1,16 @@
+---
+services:
+  dovecot:
+    restart: unless-stopped
+    container_name: dovecot
+    hostname: dovecot
+    build:
+      context: .
+      tags:
+        - "dovecot/dovecot:imapsync"
+    ports:
+      - 143:143
+      - 993:993
+    volumes:
+      - ./dovecot.conf:/etc/dovecot/dovecot.conf:ro
+      - ./mail/:/srv/vmail/Mail/
