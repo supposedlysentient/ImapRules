@@ -2,6 +2,7 @@ module Core.Tests
 
 open Expecto
 open FSharp.Core
+open Lexicon
 
 type TestCase = { input: string; tokens: Token list }
 
