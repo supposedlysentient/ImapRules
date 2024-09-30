@@ -156,7 +156,7 @@ let lex (s: string) =
             scanNumber (c :: buffer) pos' hasDecimalPoint multiplier (d :: tail)
         | _, '.' :: _ -> raise (LexError("Illegal number format", s, pos'))
         | _, c :: tail when sizeSuffixChars.ContainsKey c && isWordBreak tail ->
-            let mult' = sizeSuffixChars.[c]
+            let mult' = sizeSuffixChars[c]
             scanNumber buffer pos' hasDecimalPoint mult' tail
         | _, tail when isWordBreak tail ->
             let s = flatten buffer
