@@ -188,11 +188,11 @@ module private Production =
 
     and pAction tokens =
         match tokens with
-        | Token.Reject :: StringLiteral msg :: Semicolon :: tail -> Reject msg, tail
-        | Token.Redirect :: StringLiteral address :: Semicolon :: tail -> Redirect address, tail
-        | Token.Keep :: Semicolon :: tail -> Keep, tail
-        | Token.Discard :: Semicolon :: tail -> Discard, tail
-        | Token.FileInto :: StringLiteral folder :: Semicolon :: tail -> FileInto folder, tail
+        | Token.Reject :: StringLiteral msg :: Semicolon :: tail -> Command.Action(Reject msg), tail
+        | Token.Redirect :: StringLiteral address :: Semicolon :: tail -> Command.Action(Redirect address), tail
+        | Token.Keep :: Semicolon :: tail -> Command.Action Keep, tail
+        | Token.Discard :: Semicolon :: tail -> Command.Action Discard, tail
+        | Token.FileInto :: StringLiteral folder :: Semicolon :: tail -> Command.Action(FileInto folder), tail
         | _ -> raise ParseError
 
     and pActionTail tokens =
