@@ -1,4 +1,7 @@
 source https://api.nuget.org/v3/index.json
 
 storage: none
+nuget Fake
+nuget Fake.Core.Target
+nuget Farmer
 nuget FSharp.Core
