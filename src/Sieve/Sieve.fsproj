@@ -6,7 +6,7 @@
   <ItemGroup>
     <Compile Include="Lexicon.fs" />
     <Compile Include="Grammar.fs" />
-    <Compile Include="Core.fs" />
+    <Compile Include="Sieve.fs" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
