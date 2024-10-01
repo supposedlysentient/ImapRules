@@ -7,7 +7,7 @@ open Helpers
 
 initializeContext ()
 
-let srcPath = Path.getFullName "src/Sieve"
+let srcPath = Path.getFullName "src/Core"
 let deployPath = Path.getFullName "deploy"
 let testsPath = Path.getFullName "tests"
 
