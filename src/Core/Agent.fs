@@ -7,15 +7,19 @@ open MailKit.Net.Imap
 
 type SslOptions = MailKit.Security.SecureSocketOptions
 
-type Config = {
-    server: string
-    port: int
-    SslOptions: SslOptions
-    username: string
-    password: string
-}
+type Config =
+    { server: string
+      port: int
+      SslOptions: SslOptions
+      username: string
+      password: string }
 
 type Agent(config: Config) as this =
+    let metadataFields =
+        MailKit.MessageSummaryItems.Envelope
+        ||| MailKit.MessageSummaryItems.Headers
+        ||| MailKit.MessageSummaryItems.Size
+
     let client = new ImapClient()
     do this.Open()
 
@@ -24,12 +28,13 @@ type Agent(config: Config) as this =
         client.Authenticate(config.username, config.password)
         client.Inbox.Open(FolderAccess.ReadOnly) |> ignore
 
-    member this.FetchOne(items: MessageSummaryItems) = client.Inbox.Fetch(0, 1, items).[0]
+    member this.FetchOne() =
+        client.Inbox.Fetch(0, 1, metadataFields)[0]
 
-    member this.Query (items: MessageSummaryItems) (sieveTest: string) =
+    member this.Query(sieveTest: string) =
         let query = new SearchQuery() // TODO
         let ids = client.Inbox.Search query
-        client.Inbox.Fetch(ids, items)
+        client.Inbox.Fetch(ids, metadataFields)
 
     interface System.IDisposable with
         member this.Dispose() =

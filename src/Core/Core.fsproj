@@ -6,6 +6,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Agent.fs" />
+    <Compile Include="Config.fs" />
+    <Compile Include="Entrypoint.fs" />
     <Compile Include="Core.fs" />
   </ItemGroup>
   <ItemGroup>

@@ -6,4 +6,5 @@ nuget Fake
 nuget Fake.Core.Target
 nuget Farmer
 nuget FSharp.Core
+nuget FSharp.Json
 nuget Mailkit
