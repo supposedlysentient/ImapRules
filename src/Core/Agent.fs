@@ -15,18 +15,19 @@ type Config = {
     password: string
 }
 
-type Agent(config: Config) as this =
+type Agent(config: Config, ?client: IImapClient) as this =
     let metadataFields =
-        MailKit.MessageSummaryItems.Envelope
-        ||| MailKit.MessageSummaryItems.Headers
-        ||| MailKit.MessageSummaryItems.Size
+        MessageSummaryItems.Envelope
+        ||| MessageSummaryItems.Headers
+        ||| MessageSummaryItems.Size
 
-    let client = new ImapClient()
+    let client = defaultArg client (new ImapClient())
     do this.Open()
 
     member this.Open() =
         client.Connect(config.server, config.port, config.SslOptions)
-        client.Authenticate(config.username, config.password)
+        let cred = System.Net.NetworkCredential(config.username, config.password)
+        client.Authenticate(System.Text.Encoding.UTF8, cred)
         client.Inbox.Open(FolderAccess.ReadOnly) |> ignore
 
     member this.FetchOne() =

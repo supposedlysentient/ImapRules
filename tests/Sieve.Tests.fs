@@ -1,4 +1,4 @@
-module Core.Tests
+module Sieve.Tests
 
 open Expecto
 open FSharp.Core
@@ -68,6 +68,7 @@ let testCases = [
     }
 ]
 
+[<Tests>]
 let tests =
     testList "Sieve" [
         for case in testCases do
@@ -82,6 +83,3 @@ let tests =
 
             testCase name assertion
     ]
-
-[<EntryPoint>]
-let main _ = runTestsWithCLIArgs [] [||] tests

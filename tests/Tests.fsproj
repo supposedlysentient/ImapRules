@@ -6,10 +6,14 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="paket.references" />
+    <Compile Include="Mocks.fs" />
     <Compile Include="Sieve.Tests.fs" />
+    <Compile Include="Agent.Tests.fs" />
+    <Compile Include="Tests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../src/Sieve/Sieve.fsproj" />
+    <ProjectReference Include="../src/Core/Core.fsproj" />
   </ItemGroup>
   <Import Project="..\.paket\Paket.Restore.targets" />
 </Project>
