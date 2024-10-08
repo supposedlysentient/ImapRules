@@ -61,6 +61,7 @@ type Command =
     | Require of Require
     | Action of Action
     | Control of Control
+    | Test of Test
 
 module private Production =
     let rec pStringList tokens =
@@ -257,18 +258,46 @@ module private Production =
             Some(Require.Require sl), tail'
         | _ -> None, tokens
 
-    and pCommandList tokens =
-        match pRequire tokens with
-        | None, [] -> []
-        | Some r, tail -> Command.Require r :: pCommandList tail
-        | None, _ ->
+    and pCommand tokens =
+        match List.head tokens with
+        | Token.Require ->
+            match pRequire tokens with
+            | None, _ -> raise ParseError
+            | Some r, tail -> Command.Require r, tail
+
+        | Token.If
+        | Token.Stop ->
             match pControl tokens with
-            | Some ctl, tail -> Command.Control ctl :: pCommandList tail
-            | None, _ ->
-                try
-                    let action, tail = pAction tokens
-                    Command.Action action :: pCommandList tail
-                with _ ->
-                    raise ParseError
+            | None, _ -> raise ParseError
+            | Some c, tail -> Command.Control c, tail
+
+        | Token.Reject
+        | Token.Redirect
+        | Token.Keep
+        | Token.Discard
+        | Token.FileInto ->
+            let a, tail = pAction tokens
+            Command.Action a, tail
+
+        | Token.Address
+        | Token.Envelope
+        | Token.Header
+        | Token.Size
+        | Token.AllOf
+        | Token.AnyOf
+        | Token.Not
+        | Token.Exists
+        | Token.True
+        | Token.False ->
+            match pTest tokens with
+            | None, _ -> raise ParseError
+            | Some c, tail -> Command.Test c, tail
+
+        | _ -> raise ParseError
+
+    and pCommandList tokens =
+        match pCommand tokens with
+        | c, [] -> [ c ]
+        | c, tail -> c :: pCommandList tail
 
 let parse (tokens: Token list) = Production.pCommandList tokens

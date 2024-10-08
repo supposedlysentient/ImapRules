@@ -7,12 +7,13 @@ open MailKit.Net.Imap
 
 type SslOptions = MailKit.Security.SecureSocketOptions
 
-type Config =
-    { server: string
-      port: int
-      SslOptions: SslOptions
-      username: string
-      password: string }
+type Config = {
+    server: string
+    port: int
+    SslOptions: SslOptions
+    username: string
+    password: string
+}
 
 type Agent(config: Config) as this =
     let metadataFields =

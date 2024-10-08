@@ -2,17 +2,19 @@ module Entrypoint
 
 open Agent
 
-type CommandLineOptions =
-    { config: string
-      daemonize: bool
-      fetchOne: bool
-      query: string }
+type CommandLineOptions = {
+    config: string
+    daemonize: bool
+    fetchOne: bool
+    query: string
+} with
 
-    static member Default =
-        { config = "server.json"
-          daemonize = false
-          fetchOne = false
-          query = "" }
+    static member Default = {
+        config = "server.json"
+        daemonize = false
+        fetchOne = false
+        query = ""
+    }
 
 let printMessage (msg: MailKit.IMessageSummary) =
     let sep = "; "
