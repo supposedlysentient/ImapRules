@@ -11,6 +11,9 @@
     <None Include="paket.dependencies" />
     <None Include="paket.references" />
   </ItemGroup>
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-8g4q-xg66-9fp4" /> <!-- System.Text.Json is pulled in by Farmer -->
+  </ItemGroup>
   <Target Name="DotNetToolRestore" BeforeTargets="PaketRestore">
     <Exec Command="dotnet tool restore" />
   </Target>
