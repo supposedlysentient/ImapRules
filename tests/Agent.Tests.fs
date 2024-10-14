@@ -5,7 +5,7 @@ open MailKit
 open Agent
 open Mocks
 
-let msgs: IMessageSummary seq =
+let msgs =
     [
         {
             MockMessageData.Default with
@@ -45,8 +45,12 @@ let msgs: IMessageSummary seq =
                 Subject = "Very disappointed"
         }
     ]
-    |> Seq.map MockMessageSummary
-    |> Seq.map (fun m -> upcast m)
+    |> List.map (fun m -> MockMessageSummary m :> IMessageSummary)
+
+let queryTheories = [
+    ("address \"from\" \"buddy@my.friend\"", msgs[0..1])
+    ("address \"to\" \"brother@foo.bar\"", [ msgs[2] ])
+]
 
 let makeClient (config: Config) (msgs: IMessageSummary seq) =
     let client = new MockClient()
@@ -67,4 +71,12 @@ let tests =
             let msg = agent.FetchOne()
             Expect.equal inbox.FetchCallCount 1 "Should fetch"
             Expect.equal msg (Seq.head msgs) "Should return first message")
+        testList
+            "Queries"
+            (queryTheories
+             |> List.map (fun (query, expected) ->
+                 testCase query (fun _ ->
+                     let agent, _, _ = makeClient config msgs
+                     let actual = agent.Query query
+                     Expect.equal actual expected $"Should find {expected.Length} message(s)")))
     ]

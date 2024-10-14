@@ -138,30 +138,24 @@ let folderArgs =
         .Invoke([||])
     :?> ImapFolderConstructorArgs
 
-let emptyMsg: IMessageSummary = MockMessageSummary MockMessageData.Default
+let emptyMsg = MockMessageSummary MockMessageData.Default
 
 type MockFolder() =
     inherit ImapFolder(folderArgs)
-    let mutable msgs: IMessageSummary seq = seq [ emptyMsg ]
+    let mutable msgs: IMessageSummary seq = []
     let mutable fetchCallCount = 0
     interface IMailFolder
 
     override this.Fetch(min: int, max: int, request: IFetchRequest, ct: CancellationToken) =
         fetchCallCount <- fetchCallCount + 1
-
-        List<IMessageSummary>(
-            msgs
-            |> Seq.skip min
-            |> Seq.truncate (1 + max - min)
-            |> Seq.map (fun m -> downcast m)
-        )
+        List<IMessageSummary>(msgs |> Seq.skip min |> Seq.truncate (1 + max - min))
 
     override this.Open(access: FolderAccess, ct: CancellationToken) = access
     member this.FetchCallCount = fetchCallCount
 
     member this.Messages
         with get () = msgs
-        and set (m) = msgs <- m
+        and set (m) = msgs <- m :> IMessageSummary seq
 
 type MockClient() =
     inherit ImapClient()

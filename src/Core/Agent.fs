@@ -28,7 +28,7 @@ module Helpers =
             | "sender" -> e.Sender
             | "cc" -> e.Cc
             | "bcc" -> e.Bcc
-            | _ -> failwith "not a valid address list header: '{h}'"
+            | _ -> failwith $"not a valid address list header: '{h}'"
 
         [
             for a in al do
