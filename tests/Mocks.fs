@@ -1,5 +1,6 @@
 module Mocks
 
+open System.Collections.Generic
 open System.Threading
 open FSharp.Reflection
 open MimeKit
@@ -84,6 +85,18 @@ type MockEnvelope(data: MockMessageData) as this =
                 | _ -> prop.SetValue(this, ctor.Invoke([| null |]))
             | _ -> prop.SetValue(this, value)
 
+    interface System.IEquatable<Envelope> with
+        member this.Equals other =
+            props
+            |> Array.fold (fun (isEqual: bool) p -> isEqual && (p.GetValue(this) = p.GetValue(other))) true
+
+    override this.Equals other =
+        match other with
+        | :? Envelope as o -> (this :> System.IEquatable<_>).Equals o
+        | _ -> false
+
+    override this.GetHashCode() : int = (this :> Envelope).GetHashCode()
+
 type MockMessageSummary(data: MockMessageData) as this =
     inherit MessageSummary(0)
     let headers = HeaderList()
@@ -105,7 +118,15 @@ type MockMessageSummary(data: MockMessageData) as this =
     do typeof<MessageSummary>.GetProperty("Headers").SetValue(this, headers)
     do typeof<MessageSummary>.GetProperty("Size").SetValue(this, size)
 
-let emptyMsg = MockMessageSummary MockMessageData.Default
+    interface System.IEquatable<IMessageSummary> with
+        member this.Equals other = this.Envelope = other.Envelope // TODO
+
+    override this.Equals other =
+        match other with
+        | :? IMessageSummary as o -> (this :> System.IEquatable<_>).Equals o
+        | _ -> false
+
+    override this.GetHashCode() : int = (this :> IMessageSummary).GetHashCode()
 
 let folderArgs =
     typeof<ImapFolderConstructorArgs>
@@ -117,18 +138,30 @@ let folderArgs =
         .Invoke([||])
     :?> ImapFolderConstructorArgs
 
+let emptyMsg: IMessageSummary = MockMessageSummary MockMessageData.Default
+
 type MockFolder() =
     inherit ImapFolder(folderArgs)
-
+    let mutable msgs: IMessageSummary seq = seq [ emptyMsg ]
     let mutable fetchCallCount = 0
     interface IMailFolder
 
     override this.Fetch(min: int, max: int, request: IFetchRequest, ct: CancellationToken) =
         fetchCallCount <- fetchCallCount + 1
-        [| emptyMsg |]
+
+        List<IMessageSummary>(
+            msgs
+            |> Seq.skip min
+            |> Seq.truncate (1 + max - min)
+            |> Seq.map (fun m -> downcast m)
+        )
 
     override this.Open(access: FolderAccess, ct: CancellationToken) = access
     member this.FetchCallCount = fetchCallCount
+
+    member this.Messages
+        with get () = msgs
+        and set (m) = msgs <- m
 
 type MockClient() =
     inherit ImapClient()
