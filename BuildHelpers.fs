@@ -12,15 +12,16 @@ module Proc =
 
         let locker = obj ()
 
-        let colors =
-            [| ConsoleColor.Blue
-               ConsoleColor.Yellow
-               ConsoleColor.Magenta
-               ConsoleColor.Cyan
-               ConsoleColor.DarkBlue
-               ConsoleColor.DarkYellow
-               ConsoleColor.DarkMagenta
-               ConsoleColor.DarkCyan |]
+        let colors = [|
+            ConsoleColor.Blue
+            ConsoleColor.Yellow
+            ConsoleColor.Magenta
+            ConsoleColor.Cyan
+            ConsoleColor.DarkBlue
+            ConsoleColor.DarkYellow
+            ConsoleColor.DarkMagenta
+            ConsoleColor.DarkCyan
+        |]
 
         let print color (colored: string) (line: string) =
             lock locker (fun () ->
@@ -31,7 +32,7 @@ module Proc =
                 Console.WriteLine line)
 
         let onStdout index name (line: string) =
-            let color = colors.[index % colors.Length]
+            let color = colors[index % colors.Length]
 
             if isNull line then
                 print color $"{name}: --- END ---" ""
@@ -51,7 +52,7 @@ module Proc =
 
         let printStarting indexed =
             for (index, (name, c: CreateProcess<_>)) in indexed do
-                let color = colors.[index % colors.Length]
+                let color = colors[index % colors.Length]
                 let wd = c.WorkingDirectory |> Option.defaultValue ""
                 let exe = c.Command.Executable
                 let args = c.Command.Arguments.ToStartInfo
