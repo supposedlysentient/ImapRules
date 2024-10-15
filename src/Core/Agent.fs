@@ -104,9 +104,17 @@ module Helpers =
 
     let rec isMatch (test: Grammar.Test) (msg: IMessageSummary) =
         match test with
-        | Address(apOpt, mtOpt, compOpt, hl, kl)
-        | Envelope(apOpt, mtOpt, compOpt, hl, kl) -> isHeaderMatch apOpt mtOpt hl kl msg
-        | Header(mtOpt, compOpt, hl, kl) -> isHeaderMatch None mtOpt hl kl msg // TODO: implement Comparator
+        | Address _
+        | Envelope _
+        | Header _ ->
+            match test, None with
+            | Address(apOpt, mtOpt, compOpt, hl, kl), _
+            | Envelope(apOpt, mtOpt, compOpt, hl, kl), _
+            | Header(mtOpt, compOpt, hl, kl), apOpt ->
+                match compOpt with
+                | None -> isHeaderMatch apOpt mtOpt hl kl msg
+                | Some c -> failwith $"Not implementated yet: {c}" // TODO
+            | _ -> false
 
         | Size _ when not msg.Size.HasValue -> false
         | Size(sizeQual, size) ->
