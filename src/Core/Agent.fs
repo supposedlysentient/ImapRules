@@ -83,6 +83,7 @@ module Helpers =
         | Envelope(apOpt, mtOpt, compOpt, hl, kl) -> isHeaderMatch mtOpt hl kl msg // TODO: implement AddressPart
         | Header(mtOpt, compOpt, hl, kl) -> isHeaderMatch mtOpt hl kl msg // TODO: implement Comparator
 
+        | Size _ when not msg.Size.HasValue -> false
         | Size(sizeQual, size) ->
             let msgSize = uint msg.Size |> decimal
 
