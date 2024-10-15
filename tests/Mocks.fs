@@ -95,7 +95,17 @@ type MockEnvelope(data: MockMessageData) as this =
         | :? Envelope as o -> (this :> System.IEquatable<_>).Equals o
         | _ -> false
 
-    override this.GetHashCode() : int = (this :> Envelope).GetHashCode()
+    override this.GetHashCode() = (this :> Envelope).GetHashCode()
+
+    override this.ToString() =
+        let format (al: InternetAddressList) =
+            [
+                for a in al do
+                    (a :?> MailboxAddress).Address
+            ]
+            |> String.concat ";"
+
+        $"{{From: {format this.From}; To: {format this.To}; Subject: {this.Subject}}}"
 
 type MockMessageSummary(data: MockMessageData) as this =
     inherit MessageSummary(0)
@@ -126,7 +136,9 @@ type MockMessageSummary(data: MockMessageData) as this =
         | :? IMessageSummary as o -> (this :> System.IEquatable<_>).Equals o
         | _ -> false
 
-    override this.GetHashCode() : int = (this :> IMessageSummary).GetHashCode()
+    override this.GetHashCode() = (this :> IMessageSummary).GetHashCode()
+
+    override this.ToString() = this.Envelope.ToString()
 
 let folderArgs =
     typeof<ImapFolderConstructorArgs>

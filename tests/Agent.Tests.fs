@@ -54,22 +54,126 @@ type Expectation =
     | Messages of IMessageSummary list
     | Error
 
+type queryCase = {
+    name: string
+    query: string
+    expected: Expectation
+}
+
 let queryTheories = [
-    ("address \"from\" \"buddy@my.friend\"", Messages msgs[0..1])
-    ("address \"from\" \"does@not.exist\"", NoMessage)
-    ("aDdrEss \"fRoM\" \"bUDdY@my.FrIeNd\"", Messages msgs[0..1])
-    ("address :all \"from\" \"buddy@my.friend\"", Messages msgs[0..1])
-    ("address :localpart \"from\" \"buddy\"", Messages msgs[0..1])
-    ("address :domain \"from\" \"my.friend\"", Messages msgs[0..1])
-    ("address \"to\" \"brother@foo.bar\"", Message msgs[2])
-    ("address \"from\" [ \"brother@foo.bar\", \"sister@example.com\", \"mother@my.family\" ]", Message msgs[2])
-    ("address :localpart [ \"to\", \"cc\", \"bcc\" ] [ \"brother\", \"sister\", \"mother\", \"father\" ]",
-     Messages [ msgs[2]; msgs[5] ])
-    ("address :localpart [ \"to\", \"cc\", \"bcc\" ] [ \"foo\", \"bar\" ]", NoMessage)
-    ("header \"subject\" \"Juicy gossip\"", Message msgs[4])
-    ("header \"subject\" \"jUICY GOSSIP\"", Message msgs[4])
-    ("size :over 200k", Message msgs[4])
-    ("size :over 900k", NoMessage)
+    {
+        name = "finds by From address"
+        query =
+            """
+            address "from" "buddy@my.friend"
+            """
+        expected = Messages msgs[0..1]
+    }
+    {
+        name = "is case-insensitive"
+        query =
+            """
+            aDdrEss "fRoM" "bUDdY@my.FrIeNd"
+            """
+        expected = Messages msgs[0..1]
+    }
+    {
+        name = "finds nothing when From address does not match"
+        query =
+            """
+            address "from" "does@not.exist"
+            """
+        expected = NoMessage
+    }
+    {
+        name = "finds by entire address"
+        query =
+            """
+            address :all "from" "buddy@my.friend"
+            """
+        expected = Messages msgs[0..1]
+    }
+
+    {
+        name = "finds by local part"
+        query =
+            """
+            address :localpart "from" "buddy"
+            """
+        expected = Messages msgs[0..1]
+    }
+    {
+        name = "finds by domain"
+        query =
+            """
+            address :domain "from" "my.friend"
+            """
+        expected = Messages msgs[0..1]
+    }
+    {
+        name = "finds by To address"
+        query =
+            """
+            address "to" "brother@foo.bar"
+            """
+        expected = Message msgs[2]
+    }
+    {
+        name = "finds by list of From addresses"
+        query =
+            """
+            address "from" [ "brother@foo.bar", "sister@example.com", "mother@my.family" ]
+            """
+        expected = Message msgs[2]
+    }
+    {
+        name = "finds by list of local part of To, CC, or BCC addresses"
+        query =
+            """
+            address :localpart [ "to", "cc", "bcc" ] [ "brother", "sister", "mother", "father" ]
+            """
+        expected = Messages [ msgs[2]; msgs[5] ]
+    }
+    {
+        name = "finds nothing when list of local part of To, CC, or BCC addresses does not match"
+        query =
+            """
+            address :localpart [ "to", "cc", "bcc" ] [ "foo", "bar" ]
+            """
+        expected = NoMessage
+    }
+    {
+        name = "finds by Subject"
+        query =
+            """
+            header "subject" "Juicy gossip"
+            """
+        expected = Message msgs[4]
+    }
+    {
+        name = "is case-insensitive in Subject"
+        query =
+            """
+            header "subject" "jUICY GOSSIP"
+            """
+        expected = Message msgs[4]
+    }
+    {
+        name = "finds by Size"
+        query =
+            """
+            size :over 200k
+            """
+        expected = Message msgs[4]
+    }
+    {
+        name = "finds nothing when Size does not match"
+        query =
+            """
+            size :over 900k
+            """
+        expected = NoMessage
+    }
 ]
 
 let makeClient (config: Config) (msgs: IMessageSummary seq) =
@@ -94,22 +198,22 @@ let tests =
         testList
             "Queries"
             (queryTheories
-             |> List.map (fun (query, expected) ->
-                 testCase query (fun _ ->
+             |> List.map (fun case ->
+                 testCase case.name (fun _ ->
                      let agent, _, _ = makeClient config msgs
 
-                     match expected with
+                     match case.expected with
                      | Error ->
                          Expect.throwsT<Grammar.ParseError>
-                             (fun _ -> agent.Query query |> ignore)
+                             (fun _ -> agent.Query case.query |> ignore)
                              "Should raise parse error"
                      | _ ->
                          let expected' =
-                             match expected with
+                             match case.expected with
                              | Message e -> [ e ]
                              | Messages e -> e
                              | _ -> []
 
-                         let actual = agent.Query query
+                         let actual = agent.Query case.query
                          Expect.equal actual expected' $"Should find {expected'.Length} message(s)")))
     ]
