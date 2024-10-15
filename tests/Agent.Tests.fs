@@ -127,10 +127,10 @@ let queryTheories = [
         expected = Message msgs[2]
     }
     {
-        name = "finds by list of local part of To, CC, or BCC addresses"
+        name = "finds by list of local part of To, From, CC, or BCC addresses"
         query =
             """
-            address :localpart [ "to", "cc", "bcc" ] [ "brother", "sister", "mother", "father" ]
+            address :localpart [ "to", "from", "cc", "bcc" ] [ "brother", "sister", "mother", "father" ]
             """
         expected = Messages [ msgs[2]; msgs[5] ]
     }
@@ -215,5 +215,9 @@ let tests =
                              | _ -> []
 
                          let actual = agent.Query case.query
-                         Expect.equal actual expected' $"Should find {expected'.Length} message(s)")))
+
+                         Expect.equal
+                             actual
+                             expected'
+                             $"Should find {expected'.Length} message(s) with '{case.query.Trim()}'")))
     ]

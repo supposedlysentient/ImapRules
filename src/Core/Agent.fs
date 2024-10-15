@@ -19,23 +19,35 @@ type Config = {
 }
 
 module Helpers =
-    let getEnvelopeAddress (h: string) (e: Envelope) =
-        let al =
-            match h.ToLower() with
-            | "to" -> e.To
-            | "replyto" -> e.ReplyTo
-            | "from" -> e.From
-            | "sender" -> e.Sender
-            | "cc" -> e.Cc
-            | "bcc" -> e.Bcc
-            | _ -> failwith $"not a valid address list header: '{h}'"
+    let envelopeProperties: Map<string, System.Reflection.PropertyInfo> =
+        Map(
+            typeof<Envelope>.GetProperties()
+            |> Array.map (fun prop -> prop.Name.ToLower(), prop)
+        )
 
-        [
-            for a in al do
-                match a with
-                | :? MailboxAddress as a' -> a'.Address
-                | a -> string a
-        ]
+    type HeaderValue =
+        | AddressList of MailboxAddress list
+        | StringList of string list
+        | String of string
+        | Date of System.DateTimeOffset
+        | NoData
+
+    let getHeader (h: string) (e: Envelope) =
+        let success, prop = envelopeProperties.TryGetValue(h.ToLower())
+
+        if not success then
+            failwith $"not a valid envelope header: '{h}'"
+
+        let value = prop.GetValue(e)
+
+        match prop.PropertyType with
+        | T when T = typeof<InternetAddressList> ->
+            (value :?> InternetAddressList).Mailboxes |> List.ofSeq |> AddressList
+        | T when T = typeof<System.Nullable<System.DateTimeOffset>> ->
+            let v = value :?> System.Nullable<System.DateTimeOffset>
+            if v.HasValue then Date v.Value else NoData
+        | T when T = typeof<string> -> value :?> string |> HeaderValue.String
+        | _ -> failwith $"Failed to extract header {h} with type {prop.PropertyType.FullName}"
 
     let isStringMatch (mt: MatchType) (pattern: string) (sl: string list) =
         let pattern' = pattern.ToLower()
@@ -53,35 +65,48 @@ module Helpers =
             let filtered = List.filter (fun (s: string) -> Regex.IsMatch(s, pattern''')) sl
             filtered <> []
 
-    let isHeaderMatch (mtOpt: MatchType option) (hl: Header list) (kl: string list) (msg: IMessageSummary) =
+    let isHeaderMatch
+        (apOpt: AddressPart option)
+        (mtOpt: MatchType option)
+        (hl: Header list)
+        (kl: string list)
+        (msg: IMessageSummary)
+        =
         let mt =
             match mtOpt with
             | None -> Is
             | Some mt -> mt
 
-        let addresses =
+        let headerData =
             [
                 for h in hl do
-                    getEnvelopeAddress h msg.Envelope
+                    getHeader h msg.Envelope
             ]
+            |> List.map (function
+                | AddressList al ->
+                    let transform: MailboxAddress -> string =
+                        match apOpt with
+                        | None
+                        | Some All -> fun mb -> mb.Address
+                        | Some LocalPart -> fun mb -> mb.LocalPart
+                        | Some Domain -> fun mb -> mb.Domain
+
+                    al |> List.map transform
+                | StringList sl -> sl
+                | String s -> [ s ]
+                | Date d -> [ d.ToString("o") ] // TODO: should fail?
+                | NoData -> [])
             |> List.concat
             |> List.distinct
-            |> List.map (fun s -> s.ToLower())
+            |> List.map (fun s -> s.ToLower()) // TODO: implement case-sensitivity
 
-        let filtered =
-            [
-                for key in kl do
-                    isStringMatch mt key addresses
-            ]
-            |> List.filter (fun b -> b)
-
-        filtered <> []
+        kl |> List.exists (fun k -> isStringMatch mt k headerData)
 
     let rec isMatch (test: Grammar.Test) (msg: IMessageSummary) =
         match test with
         | Address(apOpt, mtOpt, compOpt, hl, kl)
-        | Envelope(apOpt, mtOpt, compOpt, hl, kl) -> isHeaderMatch mtOpt hl kl msg // TODO: implement AddressPart
-        | Header(mtOpt, compOpt, hl, kl) -> isHeaderMatch mtOpt hl kl msg // TODO: implement Comparator
+        | Envelope(apOpt, mtOpt, compOpt, hl, kl) -> isHeaderMatch apOpt mtOpt hl kl msg
+        | Header(mtOpt, compOpt, hl, kl) -> isHeaderMatch None mtOpt hl kl msg // TODO: implement Comparator
 
         | Size _ when not msg.Size.HasValue -> false
         | Size(sizeQual, size) ->
@@ -104,14 +129,7 @@ module Helpers =
                     h.Field.ToLower()
             ]
 
-            let filtered =
-                [
-                    for h in hl do
-                        List.contains (h.ToLower()) msgHeaders
-                ]
-                |> List.filter (fun b -> b)
-
-            filtered <> []
+            hl |> List.exists (fun h -> List.contains (h.ToLower()) msgHeaders)
 
         | True -> true
         | False -> false
