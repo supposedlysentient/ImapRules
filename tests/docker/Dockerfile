@@ -17,3 +17,9 @@ RUN wget -N $imapsync_uri -O /usr/local/bin/imapsync && \
     chmod +x /usr/local/bin/imapsync
 
 RUN usermod -p $(perl -e 'print crypt($ARGV[0], "password")' "${vmail_password}") vmail
+
+COPY ./mail/ /srv/vmail/Mail/
+
+RUN chown -R 1000:1000 /srv/vmail/Mail/
+
+VOLUME /srv/vmail/Mail/

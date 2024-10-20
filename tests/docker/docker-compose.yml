@@ -13,4 +13,7 @@ services:
       - 993:993
     volumes:
       - ./dovecot.conf:/etc/dovecot/dovecot.conf:ro
-      - ./mail/:/srv/vmail/Mail/
+      - dovecot-mail:/srv/vmail/Mail/
+
+volumes:
+  dovecot-mail:
