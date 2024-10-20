@@ -1,5 +1,6 @@
 module Agent
 
+open System.Collections.Generic
 open System.Text.RegularExpressions
 open MimeKit
 open MailKit
@@ -116,7 +117,7 @@ module Helpers =
                 | Some c -> failwith $"Not implementated yet: {c}" // TODO
             | _ -> false
 
-        | Size _ when not msg.Size.HasValue -> false
+        | Size _ when not msg.Size.HasValue -> false // if we forget to request Size
         | Size(sizeQual, size) ->
             let msgSize = uint msg.Size |> decimal
 
@@ -145,10 +146,13 @@ module Helpers =
 open Helpers
 
 type Agent(config: Config, ?client: IImapClient) as this =
-    let metadataFields =
+    let fetchRequest =
         MessageSummaryItems.Envelope
         ||| MessageSummaryItems.Headers
         ||| MessageSummaryItems.Size
+        |> FetchRequest
+
+    let mutable cache: IMessageSummary list = []
 
     let client = defaultArg client (new ImapClient())
     do this.Open()
@@ -160,7 +164,7 @@ type Agent(config: Config, ?client: IImapClient) as this =
         client.Inbox.Open(FolderAccess.ReadOnly) |> ignore
 
     member this.Fetch count =
-        client.Inbox.Fetch(0, (count - 1), metadataFields) |> List.ofSeq
+        client.Inbox.Fetch(0, (count - 1), fetchRequest) |> List.ofSeq
 
     member this.FetchOne() = (this.Fetch 1)[0]
 
@@ -174,6 +178,59 @@ type Agent(config: Config, ?client: IImapClient) as this =
 
         let msgs = this.Fetch 10 // TODO - message cache, modseq etc
         msgs |> List.filter (isMatch test)
+
+    member this.populateCache(count: uint16) =
+        let count = int count
+
+        let rec fib a b = seq {
+            for _ in [ () ] do
+                let c = a + b
+                yield c
+                yield! fib b c
+        }
+
+        let fibSeq = seq {
+            for _ in [ () ] do
+                yield 0
+                yield! fib 2 3
+        }
+
+        let rec fetchBatch (sizeSeq: int seq) (count: int) =
+            let min = Seq.head sizeSeq
+            let sizeSeq' = Seq.skip 1 sizeSeq
+            let max = Seq.head sizeSeq'
+
+            let max = if count < (max - min) then (min + count) else max
+            printf $"Fetching {count} from {min} to {max}..."
+            let batch = client.Inbox.Fetch(min, max, fetchRequest)
+            // TODO: when you request more than the inbox holds, throws MailKit.Net.Imap.ImapCommandException: The IMAP server replied to the 'FETCH' command with a 'BAD' response: Error in IMAP command FETCH: Invalid messageset (0.001 + 0.000 secs).
+            printfn $" Found {batch.Count} messages."
+
+            let count' = count - batch.Count
+            let batch' = batch |> List.ofSeq
+
+            match batch.Count, count' with
+            | 0, _ -> batch'
+            | _, c when c > 0 -> batch' @ fetchBatch sizeSeq' count'
+            | _ -> batch'
+
+        cache <- fetchBatch fibSeq count
+        cache
+
+    member this.FetchSince(date: System.DateTimeOffset) =
+        let query = SearchQuery.SentSince(date.Date)
+        let uids = client.Inbox.Search(query)
+        printfn $"Found {uids.Count} messages"
+
+        let rec fetchBatch (uids: IList<UniqueId>) =
+            if uids.Count < 30 then
+                client.Inbox.Fetch(uids, fetchRequest) |> List.ofSeq
+            else
+                let batchUids = uids |> Seq.truncate 20 |> List<UniqueId>
+                let uids' = uids |> Seq.skip 20 |> List<UniqueId>
+                (client.Inbox.Fetch(batchUids, fetchRequest) |> List.ofSeq) @ fetchBatch uids'
+
+        fetchBatch uids
 
     interface System.IDisposable with
         member this.Dispose() =

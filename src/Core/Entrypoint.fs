@@ -5,14 +5,16 @@ open Agent
 type CommandLineOptions = {
     config: string
     daemonize: bool
-    fetchOne: bool
+    fetch: uint16 option
+    since: System.DateTimeOffset option
     query: string
 } with
 
     static member Default = {
         config = "server.json"
         daemonize = false
-        fetchOne = false
+        fetch = None
+        since = None
         query = ""
     }
 
@@ -21,11 +23,20 @@ let printMessage (msg: MailKit.IMessageSummary) =
     printfn $"Subject: {msg.Envelope.Subject}"
     printfn $"From:    {msg.Envelope.From |> Seq.map string |> String.concat sep}"
     printfn $"To:      {msg.Envelope.To |> Seq.map string |> String.concat sep}"
+    printfn $"At:      {msg.Envelope.Date}"
     printfn ""
 
-let fetchOne config =
+let fetch config count =
     let agent = new Agent(config)
-    agent.FetchOne()
+
+    match count with
+    | 0us -> []
+    | 1us -> [ agent.FetchOne() ]
+    | _ -> agent.populateCache count
+
+let fetchSince config date =
+    let agent = new Agent(config)
+    agent.FetchSince date
 
 let query config rule =
     let agent = new Agent(config)
@@ -37,7 +48,12 @@ let main args =
         | [] -> options
         | "--config" :: path :: tail -> parseCommandLine { options with config = path } tail
         | "--daemonize" :: tail -> parseCommandLine { options with daemonize = true } tail
-        | "--fetch-one" :: tail -> parseCommandLine { options with fetchOne = true } tail
+        | "--fetch" :: count :: tail ->
+            let count' = System.UInt16.Parse(count)
+            parseCommandLine { options with fetch = Some count' } tail
+        | "--since" :: date :: tail ->
+            let date' = System.DateTimeOffset.Parse(date)
+            parseCommandLine { options with since = Some date' } tail
         | "--query" :: q :: tail when q.Length > 0 -> parseCommandLine { options with query = q } tail
         | s :: _ -> failwith $"bad argument: '{s}'"
 
@@ -46,10 +62,9 @@ let main args =
     let config = Config.read options.config
 
     match options with
-    | { query = q } when q.Length > 0 ->
-        for msg in query config q do
-            printMessage msg
-    | { fetchOne = true } -> fetchOne config |> printMessage
+    | { query = q } when q.Length > 0 -> query config q |> List.iter printMessage
+    | { fetch = Some count } -> fetch config count |> List.iter printMessage
+    | { since = Some date } -> fetchSince config date |> List.iter printMessage
     | _ -> ()
 
     0
