@@ -6,12 +6,12 @@ open FSharp.Reflection
 open MimeKit
 open MailKit
 open MailKit.Net.Imap
-open Agent
+open Config
 
 let config = {
     server = "mail.example.com"
     port = 143
-    SslOptions = SslOptions.None
+    sslOptions = SslOptions.None
     username = "mockuser"
     password = "mockpass"
     rulePath = []

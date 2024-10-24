@@ -8,17 +8,7 @@ open MailKit.Search
 open MailKit.Net.Imap
 open Grammar
 open ImapRules.Sieve
-
-type SslOptions = MailKit.Security.SecureSocketOptions
-
-type Config = {
-    server: string
-    port: int
-    SslOptions: SslOptions
-    username: string
-    password: string
-    rulePath: string list
-}
+open Config
 
 module Helpers =
     let envelopeProperties: Map<string, System.Reflection.PropertyInfo> =
@@ -157,7 +147,7 @@ type Agent(config: Config, ?client: IImapClient) as this =
     do this.Open()
 
     member this.Open() =
-        client.Connect(config.server, config.port, config.SslOptions)
+        client.Connect(config.server, config.port, config.sslOptions)
         let cred = System.Net.NetworkCredential(config.username, config.password)
         client.Authenticate(System.Text.Encoding.UTF8, cred)
         client.Inbox.Open(FolderAccess.ReadOnly) |> ignore

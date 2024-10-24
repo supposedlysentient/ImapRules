@@ -5,8 +5,8 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Agent.fs" />
     <Compile Include="Config.fs" />
+    <Compile Include="Agent.fs" />
     <Compile Include="Rules.fs" />
     <Compile Include="Daemon.fs" />
     <Compile Include="Entrypoint.fs" />

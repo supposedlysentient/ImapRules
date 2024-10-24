@@ -2,6 +2,7 @@ module Agent.Tests
 
 open Expecto
 open MailKit
+open Config
 open Agent
 open Mocks
 

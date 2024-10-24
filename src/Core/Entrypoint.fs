@@ -2,6 +2,8 @@ module Entrypoint
 
 open Agent
 
+type Config = Config.Config
+
 type CommandLineOptions = {
     config: string
     daemonize: bool
@@ -9,16 +11,16 @@ type CommandLineOptions = {
     since: System.DateTimeOffset option
     query: string
     testRules: string
-} with
+}
 
-    static member Default = {
-        config = "server.json"
-        daemonize = false
-        fetch = None
-        since = None
-        query = ""
-        testRules = ""
-    }
+let defaultOptions = {
+    config = "server.json"
+    daemonize = false
+    fetch = None
+    since = None
+    query = ""
+    testRules = ""
+}
 
 let printMessage (msg: MailKit.IMessageSummary) =
     let sep = "; "
@@ -45,7 +47,7 @@ let runAsDaemon config date =
     let rules = config.rulePath |> List.map Rules.read |> List.concat
     Daemon.run agent rules date
 
-let testRules config =
+let testRules (config: Config) =
     config.rulePath
     |> List.map Rules.read
     |> List.iter (fun rule -> printfn "%A" rule)
@@ -70,7 +72,7 @@ let main args =
         | "--test-rules" :: path :: tail when path.Length > 0 -> parseCommandLine { options with testRules = path } tail
         | s :: _ -> failwith $"bad argument: '{s}'"
 
-    let options = args |> List.ofSeq |> parseCommandLine CommandLineOptions.Default
+    let options = args |> List.ofSeq |> parseCommandLine defaultOptions
 
     let config = Config.read options.config
 
