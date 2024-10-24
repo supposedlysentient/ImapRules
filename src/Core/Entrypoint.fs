@@ -32,7 +32,7 @@ let fetch config count =
     match count with
     | 0us -> []
     | 1us -> [ agent.FetchOne() ]
-    | _ -> agent.populateCache count
+    | _ -> count |> int |> agent.Fetch
 
 let fetchSince config date =
     let agent = new Agent(config)
