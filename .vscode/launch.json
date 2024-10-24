@@ -13,8 +13,7 @@
             "args": [
                 "--config",
                 "${workspaceFolder}/scratch/server.json",
-                "--query",
-                "address \"from\" \"test@example.com\""
+                "--validate-rules"
             ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

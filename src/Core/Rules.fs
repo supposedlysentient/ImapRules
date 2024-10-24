@@ -9,8 +9,12 @@ open Agent
 open ImapRules.Sieve
 
 let read (path: string) =
-    let content = File.ReadAllText(path)
-    parse content
+    let basePath = Path.GetDirectoryName path
+    let file = Path.GetFileName path
+    System.IO.Directory.GetFiles(basePath, file)
+    |> Array.map File.ReadAllText
+    |> Array.map parse
+    |> List.concat
 
 module Helpers =
     let envelopeProperties: Map<string, System.Reflection.PropertyInfo> =

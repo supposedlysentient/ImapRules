@@ -21,7 +21,7 @@ type Agent(config: Config, ?client: IImapClient) as this =
         client.Connect(config.server, config.port, config.sslOptions)
         let cred = System.Net.NetworkCredential(config.username, config.password)
         client.Authenticate(System.Text.Encoding.UTF8, cred)
-        client.Inbox.Open(FolderAccess.ReadOnly) |> ignore
+        client.Inbox.Open(FolderAccess.ReadWrite) |> ignore
 
     member this.Fetch count =
         client.Inbox.Fetch(0, (count - 1), fetchRequest) |> List.ofSeq
@@ -55,14 +55,28 @@ type Agent(config: Config, ?client: IImapClient) as this =
         fetchBatch uids
 
     member this.Process (action: Action) (msg: IMessageSummary) =
+        let uid = msg.UniqueId
+        let repr = $"{uid} ('{msg.Envelope.Subject}')"
         match action with
-        | Reject msg -> printfn $"rejecting with {msg}"
-        | Redirect address -> printfn $"redirecting to {address}"
+        | Reject rejMsg -> printfn $"rejecting with '{rejMsg}': {repr}"
+        | Redirect address -> printfn $"redirecting to '{address}': {repr}"
         | Keep -> ()
-        | Discard -> printfn $"discarding"
-        | FileInto folder -> printfn $"filing into {folder}"
+        | Discard ->
+            printfn $"discarding: {repr}"
+            let request = StoreFlagsRequest(StoreAction.Add, MessageFlags.Deleted)
+            if client.Inbox.Store(uid, request) then
+                client.Inbox.Expunge()
+            else
+                failwith $"failed to mark as deleted: {repr}"
+        | FileInto f ->
+            printfn $"filing into '{f}': {repr}"
+            let folder = this.GetFolder f
+            client.Inbox.MoveTo(uid, folder) |> ignore
+
+    member this.GetFolder (path: string) =
+        client.GetFolder(path)
 
     interface System.IDisposable with
         member this.Dispose() =
-            client.Disconnect(true)
+            if client.IsConnected then client.Disconnect(true)
             client.Dispose()
