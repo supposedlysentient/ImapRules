@@ -50,12 +50,12 @@ type Action =
     | Keep
     | Discard
     | FileInto of Folder
+    | Stop
 
 type Conditional = Conditional of Test * Action list
 
 type Control =
     | If of Conditional * Conditional list * Action list
-    | Stop
 
 type Command =
     | Require of Require
@@ -194,6 +194,7 @@ module private Production =
         | Token.Keep :: Semicolon :: tail -> Keep, tail
         | Token.Discard :: Semicolon :: tail -> Discard, tail
         | Token.FileInto :: StringLiteral folder :: Semicolon :: tail -> FileInto folder, tail
+        | Token.Stop :: Semicolon :: tail -> Stop, tail
         | _ -> raise ParseError
 
     and pActionTail tokens =
@@ -244,7 +245,6 @@ module private Production =
 
     and pControl tokens =
         match tokens with
-        | Token.Stop :: Semicolon :: tail -> Some Stop, tail
         | Token.If :: _ ->
             match pIf tokens with
             | Some if', tail -> Some if', tail

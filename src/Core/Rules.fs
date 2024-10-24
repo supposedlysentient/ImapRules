@@ -146,7 +146,6 @@ let rec private process' (agent: Agent) (cmd: Command) (msg: IMessageSummary) =
     match cmd with
     | Require r -> printfn $"requiring {r}"
     | Action a -> agent.Process a msg
-    | Control Stop -> printfn $"control stop" // TODO: Stop is an Action, not a Control
     | Control(If(ifBlock, elseIfBlocks, elseBlock)) ->
         let conditionals = ifBlock :: elseIfBlocks @ [ Conditional(True, elseBlock) ]
 
@@ -162,4 +161,6 @@ let rec private process' (agent: Agent) (cmd: Command) (msg: IMessageSummary) =
     | Test t -> printfn $"test {t}"
 
 let processMessage (agent: Agent) (rules: Command list) (msg: IMessageSummary) =
-    rules |> List.iter (fun rule -> process' agent rule msg)
+    try
+        rules |> List.iter (fun rule -> process' agent rule msg)
+    with StopProcessing -> ()

@@ -7,6 +7,8 @@ open MailKit.Net.Imap
 open Grammar
 open Config
 
+exception StopProcessing
+
 type Agent(config: Config, ?client: IImapClient) as this =
     let fetchRequest =
         MessageSummaryItems.Envelope
@@ -72,6 +74,9 @@ type Agent(config: Config, ?client: IImapClient) as this =
             printfn $"filing into '{f}': {repr}"
             let folder = this.GetFolder f
             client.Inbox.MoveTo(uid, folder) |> ignore
+        | Stop ->
+            printfn $"stopping processing rules: {repr}"
+            raise StopProcessing
 
     member this.GetFolder (path: string) =
         client.GetFolder(path)
