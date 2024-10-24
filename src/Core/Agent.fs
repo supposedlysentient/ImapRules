@@ -17,6 +17,7 @@ type Config = {
     SslOptions: SslOptions
     username: string
     password: string
+    rulePath: string list
 }
 
 module Helpers =

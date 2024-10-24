@@ -14,6 +14,7 @@ let config = {
     SslOptions = SslOptions.None
     username = "mockuser"
     password = "mockpass"
+    rulePath = []
 }
 
 let UTF8 = System.Text.Encoding.UTF8
