@@ -170,7 +170,8 @@ let lex (s: string) =
         match buffer, chars with
         | [], [] -> []
         | _, [] -> [ createToken buffer ]
-        | _, c :: tail when isPunctuation c -> createToken [ c ] :: scan [] pos' tail
+        | [], c :: tail when isPunctuation c -> createToken [ c ] :: scan [] pos' tail
+        | _, c :: tail when isPunctuation c -> createToken buffer :: createToken [ c ] :: scan [] pos' tail
         | [], c :: tail when isWhitespace c -> scan [] pos' tail
         | _, c :: tail when isWhitespace c -> createToken buffer :: scan [] pos' tail
         | [], '"' :: _ ->
