@@ -40,6 +40,11 @@ let fetchSince config date =
     let agent = new Agent(config)
     agent.FetchSince date
 
+let runAsDaemon config date =
+    let agent = new Agent(config)
+    let rules = config.rulePath |> List.map Rules.read |> List.concat
+    Daemon.run agent rules date
+
 let testRules config =
     config.rulePath
     |> List.map Rules.read
@@ -70,6 +75,8 @@ let main args =
     let config = Config.read options.config
 
     match options with
+    | { daemonize = true; since = Some date } -> runAsDaemon config date
+    | { daemonize = true; since = None } -> runAsDaemon config System.DateTimeOffset.Now
     | { testRules = path } when path.Length > 0 -> testRules config
     | { query = q } when q.Length > 0 -> query config q |> List.iter printMessage
     | { fetch = Some count } -> fetch config count |> List.iter printMessage
