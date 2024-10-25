@@ -6,10 +6,11 @@ open MailKit.Search
 open MailKit.Net.Imap
 open Grammar
 open Config
+open Checkpoint
 
 exception StopProcessing
 
-type Agent(config: Config, ?client: IImapClient) as this =
+type Agent(config: Config, ?client: IImapClient, ?checkpoint: ICheckpoint) as this =
     let fetchRequest =
         MessageSummaryItems.Envelope
         ||| MessageSummaryItems.Headers
@@ -17,6 +18,7 @@ type Agent(config: Config, ?client: IImapClient) as this =
         |> FetchRequest
 
     let client = defaultArg client (new ImapClient())
+    let checkpoint = defaultArg checkpoint (new Checkpoint(config.checkpointPath))
     do this.Open()
 
     member this.Open() =
@@ -77,6 +79,9 @@ type Agent(config: Config, ?client: IImapClient) as this =
         | Stop ->
             printfn $"stopping processing rules: {repr}"
             raise StopProcessing
+
+    member this.Checkpoint (uid: UniqueId) =
+        checkpoint.Write uid.Id
 
     member this.GetFolder (path: string) =
         client.GetFolder(path)

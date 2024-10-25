@@ -6,42 +6,43 @@ open Config
 open Agent
 open Mocks
 
+let bareMsg = MockMessageData.Default
 let msgs =
     [
         {
-            MockMessageData.Default with
+            bareMsg with
                 To = [ "primary@inbox.mock" ]
                 From = [ "buddy@my.friend" ]
                 Subject = "Holiday plans"
         }
         {
-            MockMessageData.Default with
+            bareMsg with
                 To = [ "primary@inbox.mock" ]
                 From = [ "buddy@my.friend" ]
                 Subject = "Party!!!?!?!?"
         }
         {
-            MockMessageData.Default with
+            bareMsg with
                 To = [ "primary@inbox.mock"; "brother@foo.bar"; "sister@example.com" ]
                 From = [ "mother@my.family" ]
                 Subject = "Christmas"
         }
         {
-            MockMessageData.Default with
+            bareMsg with
                 To = [ "primary@inbox.mock" ]
                 From = [ "campaign@spyware.bastards" ]
                 ReplyTo = [ "sales@crap.product" ]
                 Subject = "New bullsh*t launch!"
         }
         {
-            MockMessageData.Default with
+            bareMsg with
                 To = [ "alias@inbox.mock" ]
                 From = [ "distant.acquaintance@somewhere.far" ]
                 Subject = "Juicy gossip"
                 Size = Some 500000u
         }
         {
-            MockMessageData.Default with
+            bareMsg with
                 To = [ "primary@inbox.mock" ]
                 From = [ "father@my.family" ]
                 Subject = "Very disappointed"
@@ -179,7 +180,8 @@ let queryTheories = [
 
 let makeClient (config: Config) (msgs: IMessageSummary seq) =
     let client = new MockClient()
-    let agent = new Agent(config, client)
+    let checkpoint = new MockCheckpoint()
+    let agent = new Agent(config, client, checkpoint)
     let inbox = client.Inbox :?> MockFolder
     inbox.Messages <- msgs
     agent, client, inbox

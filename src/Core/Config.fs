@@ -12,6 +12,7 @@ type Config = {
     username: string
     password: string
     rulePath: string list
+    checkpointPath: string
 }
 
 module private Config =
@@ -24,6 +25,7 @@ module private Config =
         username: string
         password: string
         rule_path: string list option
+        checkpoint_path: string option
     }
 
     let sslDecoder: Decoder<SslOptions> =
@@ -63,9 +65,8 @@ module private Config =
             username = get.Required.Field "username" Decode.string
             password = get.Required.Field "password" Decode.string
             rule_path = get.Optional.Field "rule_path" stringOrStringListDecoder
+            checkpoint_path = get.Optional.Field "checkpoint_path" Decode.string
         })
-
-let defaultRulePath = "*.sieve"
 
 let read (path: string) : Config =
     let json = File.ReadAllText(path)
@@ -84,7 +85,10 @@ let read (path: string) : Config =
         | Some p, None -> p, SslOptions.Auto
         | Some p, Some o -> p, o
 
+    let defaultRulePath = "*.sieve"
+    let defaultCheckpoint = "checkpoint"
     let basePath = Path.GetDirectoryName path
+    let checkpoint = defaultArg config.checkpoint_path (Path.Combine(basePath, defaultCheckpoint))
 
     let rulePaths =
         match config.rule_path with
@@ -101,4 +105,5 @@ let read (path: string) : Config =
         username = config.username
         password = config.password
         rulePath = rulePaths
+        checkpointPath = checkpoint
     }

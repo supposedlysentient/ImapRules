@@ -10,7 +10,11 @@ let run (agent: Agent) (rules: Command list) (date: System.DateTimeOffset) =
 
     let rec run' (uids: UniqueId list) =
         let msgs = agent.Fetch uids
-        msgs |> List.iter (fun msg -> processMessage agent rules msg)
+        msgs
+        |> List.sortBy (fun msg -> msg.UniqueId.Id) // for checkpoint reasons
+        |> List.iter (fun msg ->
+            processMessage agent rules msg
+            agent.Checkpoint msg.UniqueId)
 
         let uids' =
             match msgs with

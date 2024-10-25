@@ -7,6 +7,7 @@ open MimeKit
 open MailKit
 open MailKit.Net.Imap
 open Config
+open Checkpoint
 
 let config = {
     server = "mail.example.com"
@@ -15,6 +16,7 @@ let config = {
     username = "mockuser"
     password = "mockpass"
     rulePath = []
+    checkpointPath = ""
 }
 
 let UTF8 = System.Text.Encoding.UTF8
@@ -185,3 +187,9 @@ type MockClient() =
 
     member this.ConnectCallCount = connectCallCount
     member this.AuthCallCount = authCallCount
+
+type MockCheckpoint () =
+    interface ICheckpoint with
+        member this.Read () = 0u
+        member this.Write id = ()
+        member this.Dispose () = ()
