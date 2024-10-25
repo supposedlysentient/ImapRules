@@ -92,8 +92,7 @@ let main args =
     let config = Config.read options.config
 
     match options with
-    | { daemonize = true; since = Some date } -> runAsDaemon config date
-    | { daemonize = true; since = None } -> runAsDaemon config System.DateTimeOffset.Now
+    | { daemonize = true; since = date } -> runAsDaemon config date
     | { validateRules = true } -> validateRules config
     | { validate = true; query = (Some q) } -> validate config q
     | { query = (Some q); fetch = Some count } -> query config count q |> List.iter printMessage

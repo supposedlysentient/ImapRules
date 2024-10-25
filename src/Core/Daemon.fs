@@ -5,16 +5,19 @@ open Grammar
 open Agent
 open Rules
 
-let run (agent: Agent) (rules: Command list) (date: System.DateTimeOffset) =
-    let uids = agent.GetUidsSince date
+let run (agent: Agent) (rules: Command list) (date: System.DateTimeOffset option) =
+    let uids =
+        match date with
+        | Some date -> agent.GetUidsSince date
+        | None -> agent.GetUidsSinceCheckpoint ()
 
     let rec run' (uids: UniqueId list) =
         let msgs = agent.Fetch uids
         msgs
         |> List.sortBy (fun msg -> msg.UniqueId.Id) // for checkpoint reasons
         |> List.iter (fun msg ->
-            processMessage agent rules msg
-            agent.Checkpoint msg.UniqueId)
+            agent.Checkpoint msg.UniqueId
+            processMessage agent rules msg)
 
         let uids' =
             match msgs with

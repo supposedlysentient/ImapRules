@@ -30,7 +30,9 @@ type Checkpoint (path: string) =
                 use readStream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read, FileShare.Read)
                 use reader = new StreamReader(readStream)
                 let text = reader.ReadToEnd()
-                text.Trim() |> System.UInt32.Parse
+                match text.Trim() with
+                | "" -> 0u // checkpoint represents last message processed
+                | s -> System.UInt32.Parse s
             with _ -> failwith $"Failed to read checkpoint from {path}"
 
         member this.Write (id: uint) =

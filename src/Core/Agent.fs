@@ -44,6 +44,21 @@ type Agent(config: Config, ?client: IImapClient, ?checkpoint: ICheckpoint) as th
         printfn $"Found {uids.Count} messages"
         uids |> List.ofSeq
 
+    member this.GetUidsSinceCheckpoint () =
+        let id = checkpoint.Read ()
+        let nextId =
+            if client.Inbox.UidNext.HasValue then
+                client.Inbox.UidNext.Value.Id
+            else
+                failwith "Next UID is null; is the client connected?"
+
+        if nextId > id then
+            [ id .. nextId ]
+            |> List.skip 1 // checkpoint represents last message processed
+            |> List.map (fun id -> UniqueId(client.Inbox.UidValidity, id))
+        else
+            []
+
     member this.FetchSince(date: System.DateTimeOffset) =
         let uids = this.GetUidsSince date
         printfn $"Found {uids.Length} messages"
