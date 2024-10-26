@@ -40,14 +40,14 @@ let fetch config count =
     | 1us -> [ agent.FetchOne() ]
     | _ -> count |> int |> agent.Fetch
 
-let fetchSince config date =
+let fetchSince (config: Config) date =
     let agent = new Agent(config)
     agent.FetchSince date
 
-let runAsDaemon config date =
-    let agent = new Agent(config)
+let runAsDaemon (config: Config) date =
+    // let agent = new Agent(config)
     let rules = config.rulePath |> List.map Rules.read |> List.concat
-    Daemon.run agent rules date
+    Daemon.run config rules date
 
 let validateRules (config: Config) =
     config.rulePath

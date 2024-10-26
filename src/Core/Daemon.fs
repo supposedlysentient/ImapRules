@@ -2,14 +2,29 @@ module Daemon
 
 open MailKit
 open Grammar
+open Config
+open Logging
 open Agent
 open Rules
 
-let run (agent: Agent) (rules: Command list) (date: System.DateTimeOffset option) =
+let batchSize = 10u
+
+let run (config: Config) (rules: Command list) (date: System.DateTimeOffset option) =
+    let logger = makeLogger config
+    logger.Log Stream.Output "Agent starting"
+
+    let mutable keepRunning = true
+    System.Console.CancelKeyPress.Add (
+        fun _ ->
+            logger.Log Stream.Output "Agent stopping"
+            keepRunning <- false)
+
+    let agent = new Agent (config, logger)
+
     let uids =
         match date with
         | Some date -> agent.GetUidsSince date
-        | None -> agent.GetUidsSinceCheckpoint ()
+        | None -> agent.GetUidsSinceCheckpoint () |> List.truncate (int batchSize)
 
     let rec run' (uids: UniqueId list) =
         let msgs = agent.Fetch uids
@@ -26,11 +41,13 @@ let run (agent: Agent) (rules: Command list) (date: System.DateTimeOffset option
                 let lastMsg = msgs |> List.sortBy (fun m -> m.UniqueId.Id) |> List.last
                 let next = lastMsg.UniqueId.Id + 1u
 
-                [ next .. (next + 10u) ]
+                [ next .. (next + batchSize) ]
                 |> List.map (fun id -> UniqueId(lastMsg.UniqueId.Validity, id))
 
         System.Threading.Thread.Sleep 2000
 
-        run' uids'
+        if keepRunning then run' uids'
 
     run' uids
+
+    logger.Log Stream.Output "Agent stopping"

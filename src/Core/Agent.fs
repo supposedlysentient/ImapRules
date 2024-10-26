@@ -43,11 +43,12 @@ type Agent(config: Config, ?logger: ILogger, ?client: IImapClient, ?checkpoint: 
     member this.GetUidsSince(date: System.DateTimeOffset) =
         let query = SearchQuery.SentSince(date.Date)
         let uids = client.Inbox.Search(query)
-        printfn $"Found {uids.Count} messages"
+        logger.Log Stream.Info $"Found {uids.Count} message(s)"
         uids |> List.ofSeq
 
     member this.GetUidsSinceCheckpoint () =
         let id = checkpoint.Read ()
+        logger.Log Stream.Info $"Read checkpoint uid: {id}"
         let nextId =
             if client.Inbox.UidNext.HasValue then
                 client.Inbox.UidNext.Value.Id
@@ -63,7 +64,7 @@ type Agent(config: Config, ?logger: ILogger, ?client: IImapClient, ?checkpoint: 
 
     member this.FetchSince(date: System.DateTimeOffset) =
         let uids = this.GetUidsSince date
-        printfn $"Found {uids.Length} messages"
+        logger.Log Stream.Info $"Found {uids.Length} messages"
 
         let rec fetchBatch (uids: UniqueId list) =
             if uids.Length < 30 then
@@ -77,24 +78,24 @@ type Agent(config: Config, ?logger: ILogger, ?client: IImapClient, ?checkpoint: 
 
     member this.Process (action: Action) (msg: IMessageSummary) =
         let uid = msg.UniqueId
-        let repr = $"{uid} ('{msg.Envelope.Subject}')"
+        let repr = $"<Uid: {uid}; Sent: {msg.Envelope.Date}>"
         match action with
-        | Reject rejMsg -> printfn $"rejecting with '{rejMsg}': {repr}"
-        | Redirect address -> printfn $"redirecting to '{address}': {repr}"
+        | Reject rejMsg -> logger.Log Stream.Info $"Rejecting with '{rejMsg}': {repr}"
+        | Redirect address -> logger.Log Stream.Info $"Redirecting to '{address}': {repr}"
         | Keep -> ()
         | Discard ->
-            printfn $"discarding: {repr}"
+            logger.Log Stream.Info $"Discarding: {repr}"
             let request = StoreFlagsRequest(StoreAction.Add, MessageFlags.Deleted)
             if client.Inbox.Store(uid, request) then
                 client.Inbox.Expunge()
             else
-                failwith $"failed to mark as deleted: {repr}"
+                failwith $"Failed to mark as deleted: {repr}"
         | FileInto f ->
-            printfn $"filing into '{f}': {repr}"
+            logger.Log Stream.Info $"Filing into {f}: {repr}"
             let folder = this.GetFolder f
             client.Inbox.MoveTo(uid, folder) |> ignore
         | Stop ->
-            printfn $"stopping processing rules: {repr}"
+            logger.Log Stream.Info $"Stopping processing rules: {repr}"
             raise StopProcessing
 
     member this.Checkpoint (uid: UniqueId) =
