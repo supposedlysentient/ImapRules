@@ -18,7 +18,7 @@ type Agent(config: Config, ?logger: ILogger, ?client: IImapClient, ?checkpoint: 
         ||| MessageSummaryItems.Size
         |> FetchRequest
 
-    let logger = defaultArg logger (new ConsoleLogger ())
+    let logger = defaultArg logger (makeLogger config)
     let client = defaultArg client (new ImapClient (logger))
     let checkpoint = defaultArg checkpoint (new Checkpoint(config.checkpointPath))
     do this.Open()

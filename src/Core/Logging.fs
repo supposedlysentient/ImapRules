@@ -38,13 +38,9 @@ let Ansi = {|
     Reset = "\x1b[39m"
 |}
 
-type Stream =
-    | Error = 0
-    | Warning = 1
-    | Output = 2
-    | Info = 3
-    | Verbose = 4
-    | Debug = 5
+type Stream = Config.Stream
+
+let defaultVerbosity = Stream.Output
 
 type ILogger =
     abstract Verbosity: Stream with get, set
@@ -56,7 +52,7 @@ type ILogger =
 
 [<AbstractClass>]
 type LoggerBase (logStream: IO.Stream, ?verbosity: Stream) =
-    let mutable verbosity = defaultArg verbosity Stream.Output
+    let mutable verbosity = defaultArg verbosity defaultVerbosity
     let mutable detector = makeDetector ()
 
     // TODO:
@@ -73,7 +69,8 @@ type LoggerBase (logStream: IO.Stream, ?verbosity: Stream) =
     member val FormatMessage: Stream -> string -> string = fun _ -> id with get, set
 
     abstract member Write: Stream -> (string -> unit)
-    default this.Write (stream) = writer.WriteLine
+    default this.Write (stream) =
+        if stream <= this.Verbosity then writer.WriteLine else ignore
 
     abstract member Log: Stream -> (obj -> unit)
     default this.Log (stream: Stream) =
@@ -107,16 +104,16 @@ type LoggerBase (logStream: IO.Stream, ?verbosity: Stream) =
             this.Log Stream.Info $"Connected to {uri}"
         member this.LogClient (buffer: byte array, offset: int, count: int) =
             let msg = Encoding.ASCII.GetString(buffer, offset, count).TrimEnd()
-            this.Log Stream.Info msg
+            this.Log Stream.Debug msg
         member this.LogServer (buffer: byte array, offset: int, count: int) =
             let msg = Encoding.ASCII.GetString(buffer, offset, count).TrimEnd()
-            this.Log Stream.Info msg
+            this.Log Stream.Debug msg
 
     interface IDisposable with
         member this.Dispose () = this.Dispose ()
 
 type NullLogger (?verbosity: Stream) =
-    inherit LoggerBase(IO.Stream.Null, defaultArg verbosity Stream.Output)
+    inherit LoggerBase(IO.Stream.Null, defaultArg verbosity defaultVerbosity)
     override this.Log (_: Stream) = fun (_: obj) -> ()
     override this.Log (_: obj) = ()
     override this.LogError (_: Exception) = ()
@@ -125,7 +122,7 @@ type NullLogger (?verbosity: Stream) =
 type ConsoleLogger (?verbosity: Stream) as this =
     inherit LoggerBase(
         Console.OpenStandardOutput (),
-        defaultArg verbosity Stream.Output)
+        defaultArg verbosity defaultVerbosity)
 
     do this.FormatMessage <- (fun stream msg ->
         let color =
@@ -158,7 +155,7 @@ type ConsoleLogger (?verbosity: Stream) as this =
 type FileLogger(path: string, ?verbosity: Stream) as this =
     inherit LoggerBase(
         File.Open(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read),
-        defaultArg verbosity Stream.Output)
+        defaultArg verbosity defaultVerbosity)
 
     do this.FormatMessage <- (fun stream msg ->
         let timestamp = DateTime.Now.ToString("o")
@@ -167,7 +164,7 @@ type FileLogger(path: string, ?verbosity: Stream) as this =
 type CompoundLogger(loggers: ILogger list, ?verbosity: Stream) =
     inherit LoggerBase(IO.Stream.Null)
 
-    let mutable verbosity = defaultArg verbosity Stream.Output
+    let mutable verbosity = defaultArg verbosity defaultVerbosity
     let setChildVerbosity v = loggers |> List.iter (fun logger -> logger.Verbosity <- v)
     do setChildVerbosity verbosity
 
@@ -188,3 +185,15 @@ type CompoundLogger(loggers: ILogger list, ?verbosity: Stream) =
 
     override this.Dispose () =
         loggers |> List.iter (fun logger -> logger.Dispose())
+
+open Config
+
+let makeLogger (config: Config) : ILogger =
+    match config.logPath, config.logConsole with
+    | None, false -> new NullLogger (config.verbosity)
+    | None, true -> new ConsoleLogger (config.verbosity)
+    | Some path, false -> new FileLogger (path, config.verbosity)
+    | Some path, true -> new CompoundLogger ([
+        new ConsoleLogger (config.verbosity)
+        new FileLogger (path, config.verbosity)
+    ], config.verbosity)

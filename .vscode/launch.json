@@ -17,7 +17,8 @@
             ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
-            "console": "internalConsole"
+            "console": "internalConsole",
+            "justMyCode": false
         },
         {
             "name": "Debug tests",
