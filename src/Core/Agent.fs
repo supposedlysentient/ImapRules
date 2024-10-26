@@ -6,18 +6,20 @@ open MailKit.Search
 open MailKit.Net.Imap
 open Grammar
 open Config
+open Logging
 open Checkpoint
 
 exception StopProcessing
 
-type Agent(config: Config, ?client: IImapClient, ?checkpoint: ICheckpoint) as this =
+type Agent(config: Config, ?logger: ILogger, ?client: IImapClient, ?checkpoint: ICheckpoint) as this =
     let fetchRequest =
         MessageSummaryItems.Envelope
         ||| MessageSummaryItems.Headers
         ||| MessageSummaryItems.Size
         |> FetchRequest
 
-    let client = defaultArg client (new ImapClient())
+    let logger = defaultArg logger (new ConsoleLogger ())
+    let client = defaultArg client (new ImapClient (logger))
     let checkpoint = defaultArg checkpoint (new Checkpoint(config.checkpointPath))
     do this.Open()
 

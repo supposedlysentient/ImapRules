@@ -13,7 +13,7 @@
             "args": [
                 "--config",
                 "${workspaceFolder}/scratch/server.json",
-                "--validate-rules"
+                "--daemonize"
             ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
