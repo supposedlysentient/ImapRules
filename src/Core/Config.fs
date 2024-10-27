@@ -27,6 +27,17 @@ type Config = {
     verbosity: Stream
 }
 
+let defaults = {|
+    port = 993
+    portInsecure = 143
+    ssl = SslOptions.Auto
+    rulePath = [ "*.sieve" ]
+    checkpointPath = "checkpoint"
+    logPath = "ImapRules.log"
+    logConsole = true
+    verbosity = Stream.Output
+|}
+
 module private Config =
     open Newtonsoft.Json.Linq
 
@@ -58,15 +69,15 @@ module private Config =
                         Helpers.asInt token |> string
                     else
                         Helpers.asString token
-                Enum.Parse(typeof<'T>, raw, true) :?> 'T |> Ok
+                Enum.Parse (typeof<'T>, raw, true) :?> 'T |> Ok
             with _ ->
-                let allValues: 'T array = 'T.GetValues()
+                let allValues: 'T array = 'T.GetValues ()
                 let msgPart =
                     allValues
                     |> Array.map (fun v -> v.ToString ())
                     |> String.concat (", ")
 
-                Error (path, BadPrimitiveExtra(nameof<'T>, token, $"Expecting one of {allValues}"))
+                Error (path, BadPrimitiveExtra (nameof<'T>, token, $"Expecting one of {allValues}"))
 
     let stringOrStringListDecoder: Decoder<string list> =
         fun path token ->
@@ -76,10 +87,10 @@ module private Config =
                 |> Array.fold
                     (fun state res ->
                         match state, res with
-                        | Ok prevResults, Ok res -> Ok(prevResults @ [ res ])
+                        | Ok prevResults, Ok res -> Ok (prevResults @ [ res ])
                         | Ok _, Error e
                         | Error e, _ -> Error e)
-                    (Ok([]))
+                    (Ok [])
             else
                 [ Helpers.asString token ] |> Ok
 
@@ -93,7 +104,7 @@ module private Config =
                 if path = "" then Off else Path path
                 |> Ok
             | token when token.Type = JTokenType.Boolean && token.Value<bool>() = false -> Ok Off
-            | token -> Error (path, BadPrimitive("a non-empty string or (null|false|empty string)", token))
+            | token -> Error (path, BadPrimitive ("a non-empty string or (null|false|empty string)", token))
 
     let decoder: Decoder<SavedConfig> =
         Decode.object (fun get -> {
@@ -110,7 +121,7 @@ module private Config =
         })
 
 let read (path: string) : Config =
-    let json = File.ReadAllText(path)
+    let json = File.ReadAllText (path)
 
     let config =
         match Decode.fromString Config.decoder json with
@@ -119,29 +130,25 @@ let read (path: string) : Config =
 
     let port, sslOptions =
         match config.port, config.ssl with
-        | None, None -> 993, SslOptions.StartTls
-        | None, Some(SslOptions.None as o)
-        | None, Some(SslOptions.SslOnConnect as o) -> 143, o
-        | None, Some o -> 993, o
-        | Some p, None -> p, SslOptions.Auto
+        | None, None -> defaults.port, defaults.ssl
+        | None, Some (SslOptions.None as o) -> defaults.portInsecure, o
+        | None, Some o -> defaults.port, o
+        | Some p, None -> p, defaults.ssl
         | Some p, Some o -> p, o
 
-    let defaultRulePath = "*.sieve"
-    let defaultCheckpoint = "checkpoint"
-    let defaultLogPath = "ImapRules.log"
     let basePath = Path.GetDirectoryName path
-    let checkpoint = defaultArg config.checkpoint_path (Path.Combine(basePath, defaultCheckpoint))
+    let checkpoint = defaultArg config.checkpoint_path (Path.Combine (basePath, defaults.checkpointPath))
     let logPath =
         match config.log_path with
-        | Config.LogPath.Path p -> Path.Combine(basePath, p) |> Some
-        | Config.LogPath.Default -> Path.Combine(basePath, defaultLogPath) |> Some
+        | Config.LogPath.Path p -> Path.Combine (basePath, p) |> Some
+        | Config.LogPath.Default -> Path.Combine (basePath, defaults.logPath) |> Some
         | Config.LogPath.Off -> None
 
     let rulePaths =
         match config.rule_path with
-        | None -> [ defaultRulePath ]
-        | Some p -> p
-        |> List.map (fun path -> Directory.GetFiles(basePath, path))
+        | None -> defaults.rulePath
+        | Some path -> path
+        |> List.map (fun path -> Directory.GetFiles (basePath, path))
         |> Array.concat
         |> List.ofArray
 
@@ -154,6 +161,6 @@ let read (path: string) : Config =
         rulePath = rulePaths
         checkpointPath = checkpoint
         logPath = logPath
-        logConsole = defaultArg config.log_console true
+        logConsole = defaultArg config.log_console defaults.logConsole
         verbosity = defaultArg config.verbosity Stream.Output
     }

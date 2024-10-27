@@ -104,9 +104,9 @@ module private Production =
                 raise ParseError
 
             match addressPart, testType with
-            | _, Token.Address -> Some(Test.Address(addressPart, matchType, comparator, headers, keys)), tail'''
-            | _, Token.Envelope -> Some(Envelope(addressPart, matchType, comparator, headers, keys)), tail'''
-            | None, Token.Header -> Some(Header(matchType, comparator, headers, keys)), tail'''
+            | _, Token.Address -> Some (Test.Address (addressPart, matchType, comparator, headers, keys)), tail'''
+            | _, Token.Envelope -> Some (Envelope (addressPart, matchType, comparator, headers, keys)), tail'''
+            | None, Token.Header -> Some (Header (matchType, comparator, headers, keys)), tail'''
             | Some _, Token.Header -> raise ParseError
             | _ -> raise ParseError
 
@@ -117,7 +117,7 @@ module private Production =
                 else
                     SizeQualifier.Over
 
-            Some(Size(sizeQual', limit)), tail
+            Some (Size (sizeQual', limit)), tail
 
         | (Token.AllOf | Token.AnyOf as token) :: BracketL :: tail ->
             match pTest tail with
@@ -126,20 +126,20 @@ module private Production =
                 let tests = tHead' :: tTail
 
                 match token with
-                | Token.AnyOf -> Some(AnyOf tests), tail''
-                | Token.AllOf -> Some(AllOf tests), tail''
+                | Token.AnyOf -> Some (AnyOf tests), tail''
+                | Token.AllOf -> Some (AllOf tests), tail''
                 | _ -> raise ParseError
             | None, _ -> raise ParseError
 
         | Token.Not :: tail ->
             match pTest tail with
-            | Some test, tail' -> Some(Not test), tail'
+            | Some test, tail' -> Some (Not test), tail'
             | None, _ -> raise ParseError
 
         | Token.Exists :: tail ->
             match pStringList tail with
             | [], _ -> raise ParseError
-            | sl, tail' -> Some(Exists sl), tail'
+            | sl, tail' -> Some (Exists sl), tail'
 
         | Token.True :: tail -> Some True, tail
         | Token.False :: tail -> Some False, tail
@@ -217,7 +217,7 @@ module private Production =
         match pTest tokens with
         | Some test, tail ->
             let actions, tail' = pActionBlock tail
-            Some(Conditional(test, actions)), tail'
+            Some (Conditional (test, actions)), tail'
         | None, _ -> None, tokens
 
     and pElsifList tokens =
@@ -238,8 +238,8 @@ module private Production =
                 match pElsifList tail' with
                 | elsifBlocks, Token.Else :: tail'' ->
                     let elseActions, tail''' = pActionBlock tail''
-                    Some(Control.If(ifBlock, elsifBlocks, elseActions)), tail'''
-                | elsifBlocks, tail'' -> Some(Control.If(ifBlock, elsifBlocks, [])), tail''
+                    Some (Control.If (ifBlock, elsifBlocks, elseActions)), tail'''
+                | elsifBlocks, tail'' -> Some (Control.If (ifBlock, elsifBlocks, [])), tail''
             | None, _ -> raise ParseError
         | _ -> None, tokens
 
@@ -255,7 +255,7 @@ module private Production =
         match tokens with
         | Token.Require :: tail ->
             let sl, tail' = pStringList tail
-            Some(Require.Require sl), tail'
+            Some (Require.Require sl), tail'
         | _ -> None, tokens
 
     and pCommand tokens =

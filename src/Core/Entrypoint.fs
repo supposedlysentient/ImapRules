@@ -33,19 +33,18 @@ let printMessage (msg: MailKit.IMessageSummary) =
     printfn ""
 
 let fetch config count =
-    let agent = new Agent(config)
+    let agent = new Agent (config)
 
     match count with
     | 0us -> []
-    | 1us -> [ agent.FetchOne() ]
+    | 1us -> [ agent.FetchOne () ]
     | _ -> count |> int |> agent.Fetch
 
 let fetchSince (config: Config) date =
-    let agent = new Agent(config)
+    let agent = new Agent (config)
     agent.FetchSince date
 
 let runAsDaemon (config: Config) date =
-    // let agent = new Agent(config)
     let rules = config.rulePath |> List.map Rules.read |> List.concat
     Daemon.run config rules date
 
@@ -61,7 +60,7 @@ let validate (config: Config) query =
     |> List.iter (fun rule -> printfn "%A" rule)
 
 let query config count (rule: string) =
-    let agent = new Agent(config)
+    let agent = new Agent (config)
     let sieveCommands = ImapRules.Sieve.parse rule
     let test =
         match sieveCommands with
@@ -77,10 +76,10 @@ let main args =
         | "--config" :: path :: tail -> parseCommandLine { options with config = path } tail
         | "--daemonize" :: tail -> parseCommandLine { options with daemonize = true } tail
         | "--fetch" :: count :: tail ->
-            let count' = System.UInt16.Parse(count)
+            let count' = System.UInt16.Parse (count)
             parseCommandLine { options with fetch = Some count' } tail
         | "--since" :: date :: tail ->
-            let date' = System.DateTimeOffset.Parse(date)
+            let date' = System.DateTimeOffset.Parse (date)
             parseCommandLine { options with since = Some date' } tail
         | "--query" :: q :: tail when q.Length > 0 -> parseCommandLine { options with query = Some q } tail
         | "--validate-rules" :: tail -> parseCommandLine { options with validateRules = true } tail

@@ -11,16 +11,16 @@ open ImapRules.Sieve
 let read (path: string) =
     let basePath = Path.GetDirectoryName path
     let file = Path.GetFileName path
-    System.IO.Directory.GetFiles(basePath, file)
+    System.IO.Directory.GetFiles (basePath, file)
     |> Array.map File.ReadAllText
     |> Array.map parse
     |> List.concat
 
 module Helpers =
     let envelopeProperties: Map<string, System.Reflection.PropertyInfo> =
-        Map(
-            typeof<Envelope>.GetProperties()
-            |> Array.map (fun prop -> prop.Name.ToLower(), prop)
+        Map (
+            typeof<Envelope>.GetProperties ()
+            |> Array.map (fun prop -> prop.Name.ToLower (), prop)
         )
 
     type HeaderValue =
@@ -31,12 +31,12 @@ module Helpers =
         | NoData
 
     let getHeader (h: string) (e: Envelope) =
-        let success, prop = envelopeProperties.TryGetValue(h.ToLower())
+        let success, prop = envelopeProperties.TryGetValue (h.ToLower ())
 
         if not success then
             failwith $"not a valid envelope header: '{h}'"
 
-        let value = prop.GetValue(e)
+        let value = prop.GetValue e
 
         match prop.PropertyType with
         | T when T = typeof<InternetAddressList> ->
@@ -48,7 +48,7 @@ module Helpers =
         | _ -> failwith $"Failed to extract header {h} with type {prop.PropertyType.FullName}"
 
     let isStringMatch (mt: MatchType) (pattern: string) (sl: string list) =
-        let pattern' = pattern.ToLower()
+        let pattern' = pattern.ToLower ()
 
         match mt with
         | Is -> List.contains pattern' sl
@@ -58,9 +58,9 @@ module Helpers =
             filtered <> []
 
         | Matches ->
-            let pattern'' = Regex.Escape(pattern')
+            let pattern'' = Regex.Escape pattern'
             let pattern''' = pattern''.Replace("\\?", ".").Replace("\\*", ".*")
-            let filtered = List.filter (fun (s: string) -> Regex.IsMatch(s, pattern''')) sl
+            let filtered = List.filter (fun (s: string) -> Regex.IsMatch (s, pattern''')) sl
             filtered <> []
 
     let isHeaderMatch
@@ -92,11 +92,11 @@ module Helpers =
                     al |> List.map transform
                 | StringList sl -> sl
                 | String s -> [ s ]
-                | Date d -> [ d.ToString("o") ] // TODO: should fail?
+                | Date d -> [ d.ToString ("o") ] // TODO: should fail?
                 | NoData -> [])
             |> List.concat
             |> List.distinct
-            |> List.map (fun s -> s.ToLower()) // TODO: implement case-sensitivity
+            |> List.map (fun s -> s.ToLower ()) // TODO: implement case-sensitivity
 
         kl |> List.exists (fun k -> isStringMatch mt k headerData)
 
@@ -108,16 +108,16 @@ let rec isMatch (test: Grammar.Test) (msg: IMessageSummary) =
     | Envelope _
     | Header _ ->
         match test, None with
-        | Address(apOpt, mtOpt, compOpt, hl, kl), _
-        | Envelope(apOpt, mtOpt, compOpt, hl, kl), _
-        | Header(mtOpt, compOpt, hl, kl), apOpt ->
+        | Address (apOpt, mtOpt, compOpt, hl, kl), _
+        | Envelope (apOpt, mtOpt, compOpt, hl, kl), _
+        | Header (mtOpt, compOpt, hl, kl), apOpt ->
             match compOpt with
             | None -> isHeaderMatch apOpt mtOpt hl kl msg
             | Some c -> failwith $"Not implementated yet: {c}" // TODO
         | _ -> false
 
     | Size _ when not msg.Size.HasValue -> false // if we forget to request Size
-    | Size(sizeQual, size) ->
+    | Size (sizeQual, size) ->
         let msgSize = uint msg.Size |> decimal
 
         match sizeQual with
@@ -125,38 +125,39 @@ let rec isMatch (test: Grammar.Test) (msg: IMessageSummary) =
         | Under -> msgSize < size
 
     | AllOf [] -> true
-    | AllOf(test :: tail) -> (isMatch test msg) && (isMatch (AllOf tail) msg)
+    | AllOf (test :: tail) -> (isMatch test msg) && (isMatch (AllOf tail) msg)
     | AnyOf [] -> false
-    | AnyOf(test :: tail) -> (isMatch test msg) || (isMatch (AnyOf tail) msg)
+    | AnyOf (test :: tail) -> (isMatch test msg) || (isMatch (AnyOf tail) msg)
 
     | Not test -> not (isMatch test msg)
 
     | Exists hl ->
         let msgHeaders = [
             for h in msg.Headers do
-                h.Field.ToLower()
+                h.Field.ToLower ()
         ]
 
-        hl |> List.exists (fun h -> List.contains (h.ToLower()) msgHeaders)
+        hl |> List.exists (fun h -> List.contains (h.ToLower ()) msgHeaders)
 
     | True -> true
     | False -> false
 
+[<TailCall>]
 let rec private process' (agent: Agent) (cmd: Command) (msg: IMessageSummary) =
     match cmd with
     | Require r -> printfn $"requiring {r}"
     | Action a -> agent.Process a msg
-    | Control(If(ifBlock, elseIfBlocks, elseBlock)) ->
-        let conditionals = ifBlock :: elseIfBlocks @ [ Conditional(True, elseBlock) ]
+    | Control (If (ifBlock, elseIfBlocks, elseBlock)) ->
+        let conditionals = ifBlock :: elseIfBlocks @ [ Conditional (True, elseBlock) ]
 
         let matchingConds =
             conditionals
-            |> List.skipWhile (fun (Conditional(test, _)) -> isMatch test msg |> not)
+            |> List.skipWhile (fun (Conditional (test, _)) -> isMatch test msg |> not)
 
         match matchingConds with
         | [] -> ()
         | firstMatch :: _ ->
-            let (Conditional(_, actions)) = firstMatch
+            let (Conditional (_, actions)) = firstMatch
             actions |> List.iter (fun a -> agent.Process a msg)
     | Test t -> printfn $"test {t}"
 

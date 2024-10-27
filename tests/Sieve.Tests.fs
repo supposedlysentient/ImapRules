@@ -27,10 +27,10 @@ let testCases = [
             CBracketR
         ]
         ast = [
-            Control(
-                If(
-                    Conditional(
-                        Test.Address(None, Some Is, None, [ "from" ], [ "daffy.duck@example.com" ]),
+            Control (
+                If (
+                    Conditional (
+                        Test.Address (None, Some Is, None, [ "from" ], [ "daffy.duck@example.com" ]),
                         [ FileInto "friends" ]
                     ),
                     [],
@@ -54,10 +54,10 @@ let testCases = [
             CBracketR
         ]
         ast = [
-            Control(
-                If(
-                    Conditional(
-                        Header(Some Contains, None, [ "list-id" ], [ "<duck-hunting.example.com>" ]),
+            Control (
+                If (
+                    Conditional (
+                        Header (Some Contains, None, [ "list-id" ], [ "<duck-hunting.example.com>" ]),
                         [ Reject "No violence, please" ]
                     ),
                     [],

@@ -16,8 +16,8 @@ let private makeDetector () =
             |> Array.head
         with _ ->
             failwith $"Failed to find type {typeName} in assembly {assembly.FullName}"
-    let ctor = detectorType.GetConstructor([||])
-    ctor.Invoke ([||]) :?> IAuthenticationSecretDetector
+    let ctor = detectorType.GetConstructor [||]
+    ctor.Invoke [||] :?> IAuthenticationSecretDetector
 
 let Ansi = {|
     Black = "\x1b[30m"
@@ -75,13 +75,13 @@ type LoggerBase (logStream: IO.Stream, ?verbosity: Stream) =
     abstract member Log: Stream -> (obj -> unit)
     default this.Log (stream: Stream) =
         fun (msg: obj) ->
-            msg.ToString() |> this.FormatMessage stream |> this.Write stream
+            msg.ToString () |> this.FormatMessage stream |> this.Write stream
 
     abstract member Log: obj -> unit
     default this.Log (msg: obj) = this.Log Stream.Output msg
 
     abstract member LogError: Exception -> unit
-    default this.LogError (e: Exception) = this.Log Stream.Error (e.ToString())
+    default this.LogError (e: Exception) = this.Log Stream.Error (e.ToString ())
 
     abstract member Dispose: unit -> unit
     default this.Dispose () =
@@ -103,24 +103,24 @@ type LoggerBase (logStream: IO.Stream, ?verbosity: Stream) =
         member this.LogConnect (uri: Uri) =
             this.Log Stream.Info $"Connected to {uri}"
         member this.LogClient (buffer: byte array, offset: int, count: int) =
-            let msg = Encoding.ASCII.GetString(buffer, offset, count).TrimEnd()
-            this.Log Stream.Debug msg
+            let msg = Encoding.ASCII.GetString (buffer, offset, count)
+            this.Log Stream.Debug <| msg.TrimEnd ()
         member this.LogServer (buffer: byte array, offset: int, count: int) =
-            let msg = Encoding.ASCII.GetString(buffer, offset, count).TrimEnd()
-            this.Log Stream.Debug msg
+            let msg = Encoding.ASCII.GetString (buffer, offset, count)
+            this.Log Stream.Debug <| msg.TrimEnd ()
 
     interface IDisposable with
         member this.Dispose () = this.Dispose ()
 
 type NullLogger (?verbosity: Stream) =
-    inherit LoggerBase(IO.Stream.Null, defaultArg verbosity defaultVerbosity)
+    inherit LoggerBase (IO.Stream.Null, defaultArg verbosity defaultVerbosity)
     override this.Log (_: Stream) = fun (_: obj) -> ()
     override this.Log (_: obj) = ()
     override this.LogError (_: Exception) = ()
     override this.Dispose () = ()
 
 type ConsoleLogger (?verbosity: Stream) as this =
-    inherit LoggerBase(
+    inherit LoggerBase (
         Console.OpenStandardOutput (),
         defaultArg verbosity defaultVerbosity)
 
@@ -152,17 +152,17 @@ type ConsoleLogger (?verbosity: Stream) as this =
         errWriter.Close ()
         base.Dispose ()
 
-type FileLogger(path: string, ?verbosity: Stream) as this =
-    inherit LoggerBase(
-        File.Open(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read),
+type FileLogger (path: string, ?verbosity: Stream) as this =
+    inherit LoggerBase (
+        File.Open (path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read),
         defaultArg verbosity defaultVerbosity)
 
     do this.FormatMessage <- (fun stream msg ->
-        let timestamp = DateTime.Now.ToString("o")
+        let timestamp = DateTime.Now.ToString ("o")
         $"{timestamp.PadRight(33, ' ')} : {stream.ToString().PadRight(7, ' ')} : {msg}")
 
-type CompoundLogger(loggers: ILogger list, ?verbosity: Stream) =
-    inherit LoggerBase(IO.Stream.Null)
+type CompoundLogger (loggers: ILogger list, ?verbosity: Stream) =
+    inherit LoggerBase (IO.Stream.Null)
 
     let mutable verbosity = defaultArg verbosity defaultVerbosity
     let setChildVerbosity v = loggers |> List.iter (fun logger -> logger.Verbosity <- v)
@@ -184,7 +184,7 @@ type CompoundLogger(loggers: ILogger list, ?verbosity: Stream) =
         loggers |> List.iter (fun logger -> logger.LogError e)
 
     override this.Dispose () =
-        loggers |> List.iter (fun logger -> logger.Dispose())
+        loggers |> List.iter (fun logger -> logger.Dispose ())
 
 open Config
 

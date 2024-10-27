@@ -60,47 +60,47 @@ type MockMessageData = {
 let asAddressList (addresses: string seq) =
     InternetAddressList [|
         for a in addresses do
-            MailboxAddress("blah blah", a)
+            MailboxAddress ("blah blah", a)
     |]
 
-type MockEnvelope(data: MockMessageData) as this =
-    inherit Envelope()
+type MockEnvelope (data: MockMessageData) as this =
+    inherit Envelope ()
 
     let fieldMap =
         Map [
-            for field in FSharpType.GetRecordFields(typeof<MockMessageData>) do
+            for field in FSharpType.GetRecordFields (typeof<MockMessageData>) do
                 (field.Name, field.GetValue data)
         ]
 
-    let props = typeof<Envelope>.GetProperties()
+    let props = typeof<Envelope>.GetProperties ()
 
     do
         for prop in props do
             let value = fieldMap[prop.Name]
 
             match prop.PropertyType with
-            | T when T = typeof<InternetAddressList> -> prop.SetValue(this, asAddressList (downcast value))
+            | T when T = typeof<InternetAddressList> -> prop.SetValue (this, asAddressList (downcast value))
             | T when typeof<System.Nullable>.IsAssignableFrom T ->
-                let ctor = T.GetConstructors() |> Seq.head // Nullable<T> only has one ctor
+                let ctor = T.GetConstructors () |> Seq.head // Nullable<T> only has one ctor
 
                 match downcast value with
-                | Some v -> prop.SetValue(this, ctor.Invoke([| v |]))
-                | _ -> prop.SetValue(this, ctor.Invoke([| null |]))
-            | _ -> prop.SetValue(this, value)
+                | Some v -> prop.SetValue (this, ctor.Invoke [| v |])
+                | _ -> prop.SetValue (this, ctor.Invoke [| null |])
+            | _ -> prop.SetValue (this, value)
 
     interface System.IEquatable<Envelope> with
         member this.Equals other =
             props
-            |> Array.fold (fun (isEqual: bool) p -> isEqual && (p.GetValue(this) = p.GetValue(other))) true
+            |> Array.fold (fun (isEqual: bool) p -> isEqual && (p.GetValue this = p.GetValue other)) true
 
     override this.Equals other =
         match other with
         | :? Envelope as o -> (this :> System.IEquatable<_>).Equals o
         | _ -> false
 
-    override this.GetHashCode() = (this :> Envelope).GetHashCode()
+    override this.GetHashCode () = (this :> Envelope).GetHashCode ()
 
-    override this.ToString() =
+    override this.ToString () =
         let format (al: InternetAddressList) =
             [
                 for a in al do
@@ -110,13 +110,13 @@ type MockEnvelope(data: MockMessageData) as this =
 
         $"{{From: {format this.From}; To: {format this.To}; Subject: {this.Subject}}}"
 
-type MockMessageSummary(data: MockMessageData) as this =
-    inherit MessageSummary(0)
-    let headers = HeaderList()
+type MockMessageSummary (data: MockMessageData) as this =
+    inherit MessageSummary (0)
+    let headers = HeaderList ()
 
     do
         for h in data.Headers do
-            headers.Add(Header(UTF8, h.Key, h.Value))
+            headers.Add (Header (UTF8, h.Key, h.Value))
 
     let size =
         match data.Size with
@@ -126,10 +126,10 @@ type MockMessageSummary(data: MockMessageData) as this =
     do
         typeof<MessageSummary>
             .GetProperty("Envelope")
-            .SetValue(this, MockEnvelope(data))
+            .SetValue (this, MockEnvelope (data))
 
-    do typeof<MessageSummary>.GetProperty("Headers").SetValue(this, headers)
-    do typeof<MessageSummary>.GetProperty("Size").SetValue(this, size)
+    do typeof<MessageSummary>.GetProperty("Headers").SetValue (this, headers)
+    do typeof<MessageSummary>.GetProperty("Size").SetValue (this, size)
 
     interface System.IEquatable<IMessageSummary> with
         member this.Equals other = this.Envelope = other.Envelope // TODO
@@ -139,9 +139,9 @@ type MockMessageSummary(data: MockMessageData) as this =
         | :? IMessageSummary as o -> (this :> System.IEquatable<_>).Equals o
         | _ -> false
 
-    override this.GetHashCode() = (this :> IMessageSummary).GetHashCode()
+    override this.GetHashCode () = (this :> IMessageSummary).GetHashCode ()
 
-    override this.ToString() = this.Envelope.ToString()
+    override this.ToString () = this.Envelope.ToString ()
 
 let folderArgs =
     typeof<ImapFolderConstructorArgs>
@@ -150,39 +150,39 @@ let folderArgs =
             ||| System.Reflection.BindingFlags.Instance,
             [||]
         )
-        .Invoke([||])
+        .Invoke [||]
     :?> ImapFolderConstructorArgs
 
 let emptyMsg = MockMessageSummary MockMessageData.Default
 
-type MockFolder() =
-    inherit ImapFolder(folderArgs)
+type MockFolder () =
+    inherit ImapFolder (folderArgs)
     let mutable msgs: IMessageSummary seq = []
     let mutable fetchCallCount = 0
     interface IMailFolder
 
-    override this.Fetch(min: int, max: int, request: IFetchRequest, ct: CancellationToken) =
+    override this.Fetch (min: int, max: int, request: IFetchRequest, ct: CancellationToken) =
         fetchCallCount <- fetchCallCount + 1
         List<IMessageSummary>(msgs |> Seq.skip min |> Seq.truncate (1 + max - min))
 
-    override this.Open(access: FolderAccess, ct: CancellationToken) = access
+    override this.Open (access: FolderAccess, ct: CancellationToken) = access
     member this.FetchCallCount = fetchCallCount
 
     member this.Messages
         with get () = msgs
         and set (m) = msgs <- m :> IMessageSummary seq
 
-type MockClient() =
-    inherit ImapClient()
+type MockClient () =
+    inherit ImapClient ()
     let mutable connectCallCount = 0
     let mutable authCallCount = 0
-    let inbox = MockFolder()
+    let inbox = MockFolder ()
     override this.Inbox = inbox
 
-    override this.Connect(host: string, port: int, options: SslOptions, ct: CancellationToken) =
+    override this.Connect (host: string, port: int, options: SslOptions, ct: CancellationToken) =
         connectCallCount <- connectCallCount + 1
 
-    override this.Authenticate(encoding: System.Text.Encoding, creds: System.Net.ICredentials, ct: CancellationToken) =
+    override this.Authenticate (encoding: System.Text.Encoding, creds: System.Net.ICredentials, ct: CancellationToken) =
         authCallCount <- authCallCount + 1
 
     member this.ConnectCallCount = connectCallCount

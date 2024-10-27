@@ -179,9 +179,9 @@ let queryTheories = [
 ]
 
 let makeClient (config: Config) (msgs: IMessageSummary seq) =
-    let client = new MockClient()
-    let checkpoint = new MockCheckpoint()
-    let agent = new Agent(config, client, checkpoint)
+    let client = new MockClient ()
+    let checkpoint = new MockCheckpoint ()
+    let agent = new Agent (config, client, checkpoint)
     let inbox = client.Inbox :?> MockFolder
     inbox.Messages <- msgs
     agent, client, inbox
@@ -195,7 +195,7 @@ let tests =
             Expect.equal client.AuthCallCount 1 "Should authenticate")
         testCase "Fetches one message" (fun _ ->
             let agent, client, inbox = makeClient config msgs
-            let msg = agent.FetchOne()
+            let msg = agent.FetchOne ()
             Expect.equal inbox.FetchCallCount 1 "Should fetch"
             Expect.equal msg (Seq.head msgs) "Should return first message")
         ptestList // WIP

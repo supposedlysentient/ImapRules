@@ -9,6 +9,8 @@ insert_final_newline = true
 end_of_line = lf
 fsharp_multiline_bracket_style = stroustrup
 fsharp_newline_before_multiline_computation_expression = false
+fsharp_space_before_class_constructor = true
+fsharp_space_before_parameter = true
 
 [*.fsproj]
 indent_size = 2

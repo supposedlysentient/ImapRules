@@ -57,9 +57,9 @@ module Helpers =
     open System.Collections.Generic
     open FSharp.Reflection
 
-    let whitespaceChars = Set([ ' '; '\t'; '\r'; '\n' ])
-    let punctuationChars = Set([ '('; ')'; '['; ']'; '{'; '}'; ','; ';' ])
-    let digitChars = Set([ '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9' ])
+    let whitespaceChars = Set [ ' '; '\t'; '\r'; '\n' ]
+    let punctuationChars = Set [ '('; ')'; '['; ']'; '{'; '}'; ','; ';' ]
+    let digitChars = Set [ '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9' ]
 
     let sizeSuffixChars =
         Map [
@@ -88,7 +88,7 @@ module Helpers =
 
     let createToken (chars: char seq) =
         let s = flatten chars
-        let success, token = textToToken.TryGetValue(s.ToLower())
+        let success, token = textToToken.TryGetValue (s.ToLower ())
         if success then token else StringLiteral s
 
     let tokenCases = FSharpType.GetUnionCases typeof<Token>
@@ -97,8 +97,8 @@ module Helpers =
     let noArgCases = tokenCases |> Array.filter caseHasNoArgs
 
     for caseInfo in noArgCases do
-        let case = FSharpValue.MakeUnion(caseInfo, [||]) :?> Token
-        let name = caseInfo.Name.ToLower()
+        let case = FSharpValue.MakeUnion (caseInfo, [||]) :?> Token
+        let name = caseInfo.Name.ToLower ()
 
         let text =
             match case with
@@ -134,7 +134,7 @@ let lex (s: string) =
         let pos'' = position + 2
 
         match buffer, chars with
-        | _, [] -> raise (LexError("Unterminated string", s, pos'))
+        | _, [] -> raise (LexError ("Unterminated string", s, pos'))
         | [], '"' :: tail -> scanString buffer pos' tail
         | _, '"' :: tail -> flatten buffer, pos'', tail
         | _, '\\' :: '"' :: tail -> scanString ('"' :: buffer) pos'' tail
@@ -154,7 +154,7 @@ let lex (s: string) =
         | _, c :: tail when isDigit c -> scanNumber (c :: buffer) pos' hasDecimalPoint multiplier tail
         | false, ('.' as c) :: d :: tail when isDigit d ->
             scanNumber (c :: buffer) pos' hasDecimalPoint multiplier (d :: tail)
-        | _, '.' :: _ -> raise (LexError("Illegal number format", s, pos'))
+        | _, '.' :: _ -> raise (LexError ("Illegal number format", s, pos'))
         | _, c :: tail when sizeSuffixChars.ContainsKey c && isWordBreak tail ->
             let mult' = sizeSuffixChars[c]
             scanNumber buffer pos' hasDecimalPoint mult' tail
@@ -162,7 +162,7 @@ let lex (s: string) =
             let s = flatten buffer
             let d = decimal s
             d * multiplier, pos', tail
-        | _, _ -> raise (LexError("Illegal number format", s, pos'))
+        | _, _ -> raise (LexError ("Illegal number format", s, pos'))
 
     let rec scan (buffer: char list) (position: int) (chars: char list) =
         let pos' = position + 1
@@ -177,7 +177,7 @@ let lex (s: string) =
         | [], '"' :: _ ->
             let s, pos'', tail' = scanString [] 0 chars
             StringLiteral s :: scan [] pos'' tail'
-        | _, '"' :: _ -> raise (LexError("Illegal quote", s, pos'))
+        | _, '"' :: _ -> raise (LexError ("Illegal quote", s, pos'))
         | [], d :: _ when isDigit d ->
             let num, pos'', tail' = scanNumber [] pos' false 1m chars
             NumLiteral num :: scan [] pos'' tail'
