@@ -5,6 +5,7 @@ nuget Expecto
 nuget Fake
 nuget Fake.Core.Target
 nuget Farmer
+nuget Foq
 nuget FSharp.Core
 nuget Mailkit
 nuget Thoth.Json.Net

@@ -1,7 +1,5 @@
 module Agent
 
-open System
-open System.Collections.Generic
 open MailKit
 open MailKit.Search
 open Grammar
@@ -44,6 +42,9 @@ type Agent (
         logger.Log Stream.Info $"Found {uids.Length} message uid(s)"
         uids
 
+    member this.FetchSince (date: System.DateTimeOffset) =
+        this.GetUidsSince date |> this.Fetch
+
     member this.GetUidsSinceCheckpoint () =
         let id = checkpoint.Read ()
         logger.Log Stream.Info $"Read checkpoint uid: {id}"
@@ -58,9 +59,8 @@ type Agent (
         logger.Log Stream.Info $"Predicted {uids.Length} message uid(s)"
         uids
 
-    member this.FetchSince (date: System.DateTimeOffset) =
-        let uids = this.GetUidsSince date
-        this.Fetch uids
+    member this.FetchSinceCheckpoint () =
+        this.GetUidsSinceCheckpoint () |> this.Fetch
 
     member this.Process (action: Action) (msg: IMessageSummary) =
         let uid = msg.UniqueId

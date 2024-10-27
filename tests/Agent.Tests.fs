@@ -1,226 +1,215 @@
 module Agent.Tests
 
 open Expecto
+open Foq
 open MailKit
-open Config
+open MailKit.Search
 open Agent
 open Mocks
+open Mocks.Agent
 
-let bareMsg = MockMessageData.Default
-let msgs =
-    [
-        {
-            bareMsg with
-                To = [ "primary@inbox.mock" ]
-                From = [ "buddy@my.friend" ]
-                Subject = "Holiday plans"
-        }
-        {
-            bareMsg with
-                To = [ "primary@inbox.mock" ]
-                From = [ "buddy@my.friend" ]
-                Subject = "Party!!!?!?!?"
-        }
-        {
-            bareMsg with
-                To = [ "primary@inbox.mock"; "brother@foo.bar"; "sister@example.com" ]
-                From = [ "mother@my.family" ]
-                Subject = "Christmas"
-        }
-        {
-            bareMsg with
-                To = [ "primary@inbox.mock" ]
-                From = [ "campaign@spyware.bastards" ]
-                ReplyTo = [ "sales@crap.product" ]
-                Subject = "New bullsh*t launch!"
-        }
-        {
-            bareMsg with
-                To = [ "alias@inbox.mock" ]
-                From = [ "distant.acquaintance@somewhere.far" ]
-                Subject = "Juicy gossip"
-                Size = Some 500000u
-        }
-        {
-            bareMsg with
-                To = [ "primary@inbox.mock" ]
-                From = [ "father@my.family" ]
-                Subject = "Very disappointed"
-        }
-    ]
-    |> List.map (fun m -> MockMessageSummary m :> IMessageSummary)
+module Client =
+    open System.Collections.Generic
+    open System.Text
+    open System.Net
+    open System.Threading
+    open MailKit.Net.Imap
+    open Client
 
-type Expectation =
-    | NoMessage
-    | Message of IMessageSummary
-    | Messages of IMessageSummary list
-    | Error
+    type SslOptions = Security.SecureSocketOptions
 
-type queryCase = {
-    name: string
-    query: string
-    expected: Expectation
-}
+    type ConnectSig = string * int * SslOptions * CancellationToken -> unit
+    type AuthSig = Encoding * ICredentials * CancellationToken -> unit
+    type FolderSig = string * CancellationToken -> IMailFolder
 
-let queryTheories = [
-    {
-        name = "finds by From address"
-        query =
-            """
-            address "from" "buddy@my.friend"
-            """
-        expected = Messages msgs[0..1]
-    }
-    {
-        name = "is case-insensitive"
-        query =
-            """
-            aDdrEss "fRoM" "bUDdY@my.FrIeNd"
-            """
-        expected = Messages msgs[0..1]
-    }
-    {
-        name = "finds nothing when From address does not match"
-        query =
-            """
-            address "from" "does@not.exist"
-            """
-        expected = NoMessage
-    }
-    {
-        name = "finds by entire address"
-        query =
-            """
-            address :all "from" "buddy@my.friend"
-            """
-        expected = Messages msgs[0..1]
+    type OpenSig = FolderAccess * CancellationToken -> FolderAccess
+    type FetchSig = IList<UniqueId> * IFetchRequest * CancellationToken -> IList<IMessageSummary>
+    type MoveSig = UniqueId * IMailFolder * CancellationToken -> System.Nullable<UniqueId>
+    type StoreSig = UniqueId * IStoreFlagsRequest * CancellationToken -> bool
+
+    let uid = UniqueId (1u, 1u)
+
+    let makeFolder () =
+        Mock<IMailFolder>()
+            .Setup(fun f -> <@ f.IsOpen @>).Returns(false)
+            .SetupMethod(fun f -> <@ f.Open : OpenSig @>).Returns(FolderAccess.ReadWrite)
+            .SetupMethod(fun f -> <@ f.Fetch : FetchSig @>).Returns(new List<IMessageSummary>())
+            .SetupMethod(fun f -> <@ f.MoveTo : MoveSig @>).Returns(uid)
+            .SetupMethod(fun f -> <@ f.Store : StoreSig @>).Returns(true)
+            .SetupMethod(fun f -> <@ f.Expunge : CancellationToken -> unit @>).Returns(())
+            .Create()
+
+    let makeImapClient (inbox: IMailFolder) =
+        Mock<IImapClient>()
+            .Setup(fun c -> <@ c.IsConnected @>).Returns(false)
+            .SetupMethod(fun c -> <@ c.Connect : ConnectSig @>).Returns(())
+            .Setup(fun c -> <@ c.IsAuthenticated @>).Returns(false)
+            .SetupMethod(fun c -> <@ c.Authenticate : AuthSig @>).Returns(())
+            .Setup(fun c -> <@ c.Inbox @>).Returns(inbox)
+            .SetupMethod(fun c -> <@ c.GetFolder : FolderSig @>).Returns(makeFolder ())
+            .Create()
+
+    let makeClient imapClient : IClient =
+        new Client (config, makeLogger (), imapClient)
+
+    [<Tests>]
+    let tests =
+        testList "Client" [
+            test "connects" {
+                let inbox = makeFolder ()
+                let imapClient = makeImapClient inbox
+                let client = makeClient imapClient
+
+                Mock.Expect(<@ imapClient.IsConnected @>, Times.Once)
+                Mock.Expect(<@ imapClient.Connect (
+                    config.server,
+                    config.port,
+                    config.sslOptions) @>, Times.Once)
+                Mock.Expect(<@ imapClient.IsAuthenticated @>, Times.Once)
+                Mock.Expect(<@ imapClient.Authenticate (
+                    Encoding.UTF8,
+                    It.Is<ICredentials>(fun cred ->
+                        let cred = cred :?> NetworkCredential
+                        cred.UserName = config.username && cred.Password = config.password)
+                ) @>, Times.Once)
+
+                client.Fetch [] |> ignore
+
+                Mock.VerifyAll(imapClient)
+            }
+            test "opens inbox" {
+                let inbox = makeFolder ()
+                let imapClient = makeImapClient inbox
+                let client = makeClient imapClient
+
+                Mock.Expect(<@ inbox.IsOpen @>, Times.Once)
+                Mock.Expect(<@ inbox.Open (It.Is(
+                    fun (access: FolderAccess) -> access = FolderAccess.ReadWrite
+                )) @>, Times.Once)
+
+                client.Fetch [] |> ignore
+
+                Mock.VerifyAll(inbox)
+            }
+            test "moves message" {
+                let inbox = makeFolder ()
+                let imapClient = makeImapClient inbox
+                let client = makeClient imapClient
+                let folderName = "foo"
+
+                Mock.Expect(<@ imapClient.GetFolder folderName @>, Times.Once)
+                Mock.Expect(<@ inbox.Open (It.Is(
+                    fun (access: FolderAccess) -> access = FolderAccess.ReadWrite
+                )) @>, Times.Once)
+
+                client.MoveTo (uid, folderName)
+
+                Mock.VerifyAll(imapClient)
+                Mock.VerifyAll(inbox)
+            }
+            test "deletes message" {
+                let inbox = makeFolder ()
+                let imapClient = makeImapClient inbox
+                let client = makeClient imapClient
+                let deletedFlag = StoreFlagsRequest (StoreAction.Add, MessageFlags.Deleted)
+
+                Mock.Expect(<@ inbox.Store (uid, It.Is<IStoreFlagsRequest>(
+                    fun request -> request.Action = deletedFlag.Action && request.Flags = deletedFlag.Flags
+                )) @>, Times.Once)
+                Mock.Expect(<@ inbox.Expunge @>, Times.Once)
+
+                client.Delete uid
+
+                Mock.VerifyAll(inbox)
+            }
+        ]
+
+module Fetch =
+    let uidNext = UniqueId (inboxValidity, 666u)
+
+    let uids = makeUids [ 1 ]
+    let msgs = uids |> makeMsgs
+    let makeClient msgs =
+        Mocks.Agent.makeClient msgs uids uidNext
+
+    let makeAgent msgs =
+        new Agent(
+            config,
+            makeLogger (),
+            makeClient msgs,
+            makeCheckpoint uidNext
+        )
+
+    let date = System.DateTimeOffset.Parse("1999-12-31T23:59Z")
+
+    type Fixture = {
+        uids: UniqueId list
+        msgs: IMessageSummary list
+        logger: Logging.ILogger
+        client: Client.IClient
+        checkpoint: Checkpoint.ICheckpoint
+        agent: Agent
     }
 
-    {
-        name = "finds by local part"
-        query =
-            """
-            address :localpart "from" "buddy"
-            """
-        expected = Messages msgs[0..1]
-    }
-    {
-        name = "finds by domain"
-        query =
-            """
-            address :domain "from" "my.friend"
-            """
-        expected = Messages msgs[0..1]
-    }
-    {
-        name = "finds by To address"
-        query =
-            """
-            address "to" "brother@foo.bar"
-            """
-        expected = Message msgs[2]
-    }
-    {
-        name = "finds by list of From addresses"
-        query =
-            """
-            address "from" [ "brother@foo.bar", "sister@example.com", "mother@my.family" ]
-            """
-        expected = Message msgs[2]
-    }
-    {
-        name = "finds by list of local part of To, From, CC, or BCC addresses"
-        query =
-            """
-            address :localpart [ "to", "from", "cc", "bcc" ] [ "brother", "sister", "mother", "father" ]
-            """
-        expected = Messages [ msgs[2]; msgs[5] ]
-    }
-    {
-        name = "finds nothing when list of local part of To, CC, or BCC addresses does not match"
-        query =
-            """
-            address :localpart [ "to", "cc", "bcc" ] [ "foo", "bar" ]
-            """
-        expected = NoMessage
-    }
-    {
-        name = "finds by Subject"
-        query =
-            """
-            header "subject" "Juicy gossip"
-            """
-        expected = Message msgs[4]
-    }
-    {
-        name = "is case-insensitive in Subject"
-        query =
-            """
-            header "subject" "jUICY GOSSIP"
-            """
-        expected = Message msgs[4]
-    }
-    {
-        name = "finds by Size"
-        query =
-            """
-            size :over 200k
-            """
-        expected = Message msgs[4]
-    }
-    {
-        name = "finds nothing when Size does not match"
-        query =
-            """
-            size :over 900k
-            """
-        expected = NoMessage
-    }
-]
+    let setup ids =
+        let uids = makeUids ids
+        let msgs = uids |> makeMsgs
+        let logger = makeLogger ()
+        let client = makeClient msgs
+        let cp = makeCheckpoint uidNext
+        {
+            uids = uids
+            msgs = msgs
+            logger = logger
+            client = client
+            checkpoint = cp
+            agent = new Agent(config, logger, client, cp)
+        }
 
-let makeClient (config: Config) (msgs: IMessageSummary seq) =
-    let client = new MockClient ()
-    let checkpoint = new MockCheckpoint ()
-    let agent = new Agent (config, client, checkpoint)
-    let inbox = client.Inbox :?> MockFolder
-    inbox.Messages <- msgs
-    agent, client, inbox
+
+    [<Tests>]
+    let tests =
+        testList "Fetch" [
+            testTheory "by count" [ []; [ 1 ]; [ 1 .. 5 ] ] (
+                fun ids ->
+                    let count = uint ids.Length
+                    let fixture = setup ids
+                    let actual = fixture.agent.Fetch count
+                    Expect.equal actual.Length ids.Length $"should fetch {count} message(s)"
+                    Expect.equal actual fixture.msgs $"should not change message order")
+
+            testTheory "by uid" [ []; [ 1 ]; [ 1 .. 5 ] ] (
+                fun ids ->
+                    let count = uint ids.Length
+                    let fixture = setup ids
+                    let actual = fixture.agent.Fetch fixture.uids
+                    Expect.equal actual.Length ids.Length $"should fetch {count} message(s)"
+                    Expect.equal actual fixture.msgs $"should not change message order")
+
+            test "since date" {
+                let fixture = setup [ 1 .. 3 ]
+                let actual = fixture.agent.FetchSince date
+                Expect.equal actual fixture.msgs $"should fetch messages"
+
+                let expected = SearchQuery.SentSince date.Date
+                let queryTest (arg: SearchQuery) =
+                    arg.Term = expected.Term &&
+                    (arg :?> DateSearchQuery).Date = expected.Date
+                Mock.Verify(<@ fixture.client.Search(It.Is(queryTest)) @>)
+            }
+
+            test "since checkpoint" {
+                let fixture = setup [ 1 .. 3 ]
+                let actual = fixture.agent.FetchSinceCheckpoint ()
+                Expect.equal actual fixture.msgs $"should fetch messages"
+                Mock.Verify(<@ fixture.checkpoint.Read () @>, Times.Once)
+            }
+        ]
+
 
 [<Tests>]
 let tests =
-    testList "Core" [
-        testCase "Connects over IMAP" (fun _ ->
-            let agent, client, _ = makeClient config []
-            Expect.equal client.ConnectCallCount 1 "Should connect"
-            Expect.equal client.AuthCallCount 1 "Should authenticate")
-        testCase "Fetches one message" (fun _ ->
-            let agent, client, inbox = makeClient config msgs
-            let msg = agent.FetchOne ()
-            Expect.equal inbox.FetchCallCount 1 "Should fetch"
-            Expect.equal msg (Seq.head msgs) "Should return first message")
-        ptestList // WIP
-            "Queries"
-            (queryTheories
-             |> List.map (fun case ->
-                 testCase case.name (fun _ ->
-                     let agent, _, _ = makeClient config msgs
-
-                     match case.expected with
-                     | Error ->
-                         Expect.throwsT<Grammar.ParseError>
-                             (fun _ -> (*agent.Query*) case.query |> ignore)
-                             "Should raise parse error"
-                     | _ ->
-                         let expected' =
-                             match case.expected with
-                             | Message e -> [ e ]
-                             | Messages e -> e
-                             | _ -> []
-
-                         let actual = (*agent.Query case.query*) msgs
-
-                         Expect.equal
-                             actual
-                             expected'
-                             $"Should find {expected'.Length} message(s) with '{case.query.Trim()}'")))
+    testList "Agent" [
+        Client.tests
+        Fetch.tests
     ]
