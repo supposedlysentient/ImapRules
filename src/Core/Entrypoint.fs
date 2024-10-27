@@ -37,8 +37,8 @@ let fetch config count =
 
     match count with
     | 0us -> []
-    | 1us -> [ agent.FetchOne () ]
-    | _ -> count |> int |> agent.Fetch
+    | 1us -> agent.Fetch 1u
+    | _ -> count |> uint |> agent.Fetch
 
 let fetchSince (config: Config) date =
     let agent = new Agent (config)
@@ -66,7 +66,7 @@ let query config count (rule: string) =
         match sieveCommands with
         | Grammar.Test t :: [] -> t
         | _ -> failwith "Sieve script was not a bare conditional test"
-    let msgs = count |> int |> agent.Fetch
+    let msgs = count |> uint |> agent.Fetch
     msgs |> List.filter (Rules.isMatch test)
 
 let main args =

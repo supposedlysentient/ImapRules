@@ -1,74 +1,65 @@
 module Agent
 
+open System
 open System.Collections.Generic
 open MailKit
 open MailKit.Search
 open Grammar
 open Config
 open Logging
+open Client
 open Checkpoint
 
 exception StopProcessing
 
-
-let fetchRequest =
-    MessageSummaryItems.Envelope
-    ||| MessageSummaryItems.Headers
-    ||| MessageSummaryItems.Size
-    |> FetchRequest
+let makeUids (validity: uint) (ids: uint seq) =
+    [ for id in ids do UniqueId (validity, id) ]
 
 type Agent (
     config: Config,
     ?logger: ILogger,
-    ?client: Net.Imap.IImapClient,
-    ?checkpoint: ICheckpoint) as this =
+    ?client: IClient,
+    ?checkpoint: ICheckpoint) =
 
     let logger = defaultArg logger (makeLogger config)
-    let client = defaultArg client (new Net.Imap.ImapClient (logger))
+    let client = defaultArg client (new Client (config, logger))
     let checkpoint = defaultArg checkpoint (new Checkpoint (config.checkpointPath))
-    do this.Open ()
-
-    member this.Open () =
-        client.Connect (config.server, config.port, config.sslOptions)
-        let cred = System.Net.NetworkCredential (config.username, config.password)
-        client.Authenticate (System.Text.Encoding.UTF8, cred)
-        client.Inbox.Open (FolderAccess.ReadWrite) |> ignore
 
     member this.Fetch count =
-        client.Inbox.Fetch (0, (count - 1), fetchRequest) |> List.ofSeq
+        let next = client.UidNext.Id
+        let first = next - uint count
+        let uids = [ first .. next - 1u ] |> makeUids client.UidValidity
+        this.Fetch uids
 
     member this.Fetch (uids: UniqueId list) =
-        let uids' = List<UniqueId> uids
-        client.Inbox.Fetch (uids', fetchRequest) |> List.ofSeq
+        let msgs = client.Fetch uids
+        logger.Log Stream.Info $"Found {msgs.Length} message(s)"
+        msgs
 
     member this.Fetch (uid: UniqueId) = this.Fetch [ uid ]
 
-    member this.FetchOne () = (this.Fetch 1)[0]
-
     member this.GetUidsSince (date: System.DateTimeOffset) =
         let query = SearchQuery.SentSince (date.Date)
-        let uids = client.Inbox.Search (query)
-        uids |> List.ofSeq
+        let uids = client.Search (query)
+        logger.Log Stream.Info $"Found {uids.Length} message uid(s)"
+        uids
 
     member this.GetUidsSinceCheckpoint () =
         let id = checkpoint.Read ()
         logger.Log Stream.Info $"Read checkpoint uid: {id}"
-        let nextId =
-            if client.Inbox.UidNext.HasValue then
-                client.Inbox.UidNext.Value.Id
+        let nextId = client.UidNext.Id
+        let uids =
+            if nextId > id then
+                [ id .. nextId ]
+                |> List.skip 1 // checkpoint represents last message processed
+                |> List.map (fun id -> UniqueId (client.UidValidity, id))
             else
-                failwith "Next UID is null; is the client connected?"
-
-        if nextId > id then
-            [ id .. nextId ]
-            |> List.skip 1 // checkpoint represents last message processed
-            |> List.map (fun id -> UniqueId (client.Inbox.UidValidity, id))
-        else
-            []
+                []
+        logger.Log Stream.Info $"Predicted {uids.Length} message uid(s)"
+        uids
 
     member this.FetchSince (date: System.DateTimeOffset) =
         let uids = this.GetUidsSince date
-        logger.Log Stream.Info $"Found {uids.Length} message(s)"
         this.Fetch uids
 
     member this.Process (action: Action) (msg: IMessageSummary) =
@@ -80,15 +71,10 @@ type Agent (
         | Keep -> ()
         | Discard ->
             logger.Log Stream.Info $"Discarding: {repr}"
-            let request = StoreFlagsRequest (StoreAction.Add, MessageFlags.Deleted)
-            if client.Inbox.Store (uid, request) then
-                client.Inbox.Expunge ()
-            else
-                failwith $"Failed to mark as deleted: {repr}"
-        | FileInto f ->
-            logger.Log Stream.Info $"Filing into {f}: {repr}"
-            let folder = this.GetFolder f
-            client.Inbox.MoveTo (uid, folder) |> ignore
+            client.Delete uid
+        | FileInto folder ->
+            logger.Log Stream.Info $"Filing into {folder}: {repr}"
+            client.MoveTo (uid, folder)
         | Stop ->
             logger.Log Stream.Info $"Stopping processing rules: {repr}"
             raise StopProcessing
@@ -96,10 +82,6 @@ type Agent (
     member this.Checkpoint (uid: UniqueId) =
         checkpoint.Write uid.Id
 
-    member this.GetFolder (path: string) =
-        client.GetFolder (path)
-
     interface System.IDisposable with
         member this.Dispose () =
-            if client.IsConnected then client.Disconnect (true)
             client.Dispose ()
