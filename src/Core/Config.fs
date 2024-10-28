@@ -18,8 +18,7 @@ type Config = {
     server: string
     port: int
     sslOptions: SslOptions
-    username: string
-    password: string
+    credential: System.Net.NetworkCredential
     rulePath: string list
     checkpointPath: string
     logPath: string option
@@ -32,6 +31,7 @@ let defaults = {|
     portInsecure = 143
     ssl = SslOptions.Auto
     rulePath = [ "*.sieve" ]
+    credentialPath = "credential"
     checkpointPath = "checkpoint"
     logPath = "ImapRules.log"
     logConsole = true
@@ -48,12 +48,13 @@ module private Config =
         | Default
         | Path of string
 
-    type SavedConfig = {
+    type JsonConfig = {
         server: string
         port: int option
         ssl: SslOptions option
-        username: string
-        password: string
+        username: string option
+        password: string option
+        credential_path: string option
         rule_path: string list option
         checkpoint_path: string option
         log_path: LogPath
@@ -106,13 +107,14 @@ module private Config =
             | token when token.Type = JTokenType.Boolean && token.Value<bool>() = false -> Ok Off
             | token -> Error (path, BadPrimitive ("a non-empty string or (null|false|empty string)", token))
 
-    let decoder: Decoder<SavedConfig> =
+    let decoder: Decoder<JsonConfig> =
         Decode.object (fun get -> {
             server = get.Required.Field "server" Decode.string
             port = get.Optional.Field "port" Decode.int
             ssl = get.Optional.Field "ssl" enumDecoder<SslOptions>
-            username = get.Required.Field "username" Decode.string
-            password = get.Required.Field "password" Decode.string
+            username = get.Optional.Field "username" Decode.string
+            password = get.Optional.Field "password" Decode.string
+            credential_path = get.Optional.Field "credential_path" Decode.string
             rule_path = get.Optional.Field "rule_path" stringOrStringListDecoder
             checkpoint_path = get.Optional.Field "checkpoint_path" Decode.string
             log_path = get.Required.Raw (logPathDecoder "log_path")
@@ -152,12 +154,31 @@ let read (path: string) : Config =
         |> Array.concat
         |> List.ofArray
 
+    let readCred path =
+        let lines = File.ReadAllLines(path) |> Array.filter (
+            fun s -> s.Length > 0 && not (s.TrimStart().StartsWith('#')))
+        if lines.Length <> 2 then
+            failwith $"Credentials at {path} should contain username and password on separate lines"
+        System.Net.NetworkCredential (lines[0], lines[1])
+
+    let cred =
+        match config.username, config.password, config.credential_path with
+        | Some u, Some p, None ->
+            System.Net.NetworkCredential (u, p)
+        | _, _, Some path ->
+            let path = Path.Combine (basePath, path)
+            readCred path
+        | _ ->
+            let path = Path.Combine (basePath, defaults.credentialPath)
+            if File.Exists path then
+                readCred path
+            else
+                failwith "No credentials supplied"
     {
         server = config.server
         port = port
         sslOptions = sslOptions
-        username = config.username
-        password = config.password
+        credential = cred
         rulePath = rulePaths
         checkpointPath = checkpoint
         logPath = logPath

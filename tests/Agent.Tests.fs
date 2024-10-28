@@ -68,9 +68,7 @@ module Client =
                 Mock.Expect(<@ imapClient.IsAuthenticated @>, Times.Once)
                 Mock.Expect(<@ imapClient.Authenticate (
                     Encoding.UTF8,
-                    It.Is<ICredentials>(fun cred ->
-                        let cred = cred :?> NetworkCredential
-                        cred.UserName = config.username && cred.Password = config.password)
+                    It.Is<ICredentials>(fun cred -> cred :?> NetworkCredential = config.credential)
                 ) @>, Times.Once)
 
                 client.Fetch [] |> ignore

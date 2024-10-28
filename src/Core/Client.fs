@@ -32,8 +32,7 @@ type Client (config: Config, logger: ILogger, ?imapClient: IImapClient) =
         if not _client.IsConnected then
             _client.Connect (config.server, config.port, config.sslOptions)
         if not _client.IsAuthenticated then
-            let cred = System.Net.NetworkCredential (config.username, config.password)
-            _client.Authenticate (System.Text.Encoding.UTF8, cred)
+            _client.Authenticate (System.Text.Encoding.UTF8, config.credential)
         _client
 
     member private this.Inbox with get () =
