@@ -1,0 +1,74 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/fsackur/ImapRules/config.schema.json",
+    "title": "Config",
+    "description": "Configuration file for ImapRules",
+    "type": "object",
+    "properties": {
+        "server": {
+            "description": "Mail server address",
+            "type": "string",
+            "examples": [ "mail.example.com" ]
+        },
+        "port": {
+            "description": "Mail server port",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 65535,
+            "default": 993,
+            "examples": [ 993, 143 ]
+        },
+        "ssl": {
+            "description": "Mail server security setting",
+            "enum": [ "none", "auto", "sslonconnect", "starttls", "starttlswhenavailable" ],
+            "default": "auto"
+        },
+        "username": {
+            "description": "Mail server username",
+            "type": "string"
+        },
+        "password": {
+            "description": "Mail server password",
+            "type": "string"
+        },
+        "credential_path": {
+            "description": "Path to file containing mail server username and password. File should contain username on the first line and password on the second line.",
+            "type": "string",
+            "default": "credential"
+        },
+        "rule_path": {
+            "description": "Path to the sieve files for mail filtering rules",
+            "oneOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1
+                }
+            ]
+        },
+        "checkpoint_path": {
+            "description": "Path to the checkpoint files for keeping track of processed messages",
+            "type": "string",
+            "default": "checkpoint"
+        },
+        "log_path": {
+            "description": "Path to the log files",
+            "type": "string",
+            "default": "ImapRules.log"
+        },
+        "log_console": {
+            "description": "Whether to log to the console",
+            "type": "boolean"
+        },
+        "verbosity": {
+            "description": "Log level",
+            "enum": [ "error", "warning", "output", "info", "verbose", "debug" ]
+        }
+    },
+    "required": [ "server" ]
+}

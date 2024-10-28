@@ -16,6 +16,11 @@
     <Compile Include="Core.fs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="../../config.schema.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Sieve/Sieve.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />

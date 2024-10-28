@@ -2,5 +2,13 @@
     "[fsharp]": {
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "Ionide.Ionide-fsharp"
-    }
+    },
+    "json.schemas": [
+        {
+            "fileMatch": [
+                "**/config.json"
+            ],
+            "url": "./config.schema.json"
+        }
+    ]
 }
