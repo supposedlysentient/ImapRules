@@ -1,5 +1,7 @@
 module Entrypoint
 
+open System
+open System.IO
 open Agent
 
 type Config = Config.Config
@@ -15,7 +17,7 @@ type CommandLineOptions = {
 }
 
 let defaultOptions = {
-    config = "server.json"
+    config = "config.json"
     daemonize = false
     fetch = None
     since = None
@@ -23,6 +25,33 @@ let defaultOptions = {
     validate = false
     validateRules = false
 }
+
+let findConfigPath projectName providedPath =
+    let configPaths =
+        seq {
+            yield Path.GetFullPath providedPath
+
+            yield! seq {
+                yield Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+
+                let xdg = Environment.GetEnvironmentVariable("XDG_CONFIG_DIRS")
+                let xdg = if xdg = null then "" else xdg
+                yield!
+                    xdg.Split(Path.PathSeparator)
+                    |> Array.filter (fun (path: string) -> path.Length > 0)
+
+                yield "/etc/"
+            }
+            |> Seq.map (fun basePath -> Path.Combine(basePath, projectName, providedPath))
+        }
+
+    try
+        configPaths
+        |> Seq.filter Path.Exists
+        |> Seq.head
+    with e when e.Message.StartsWith("The input sequence was empty") ->
+        let searched = configPaths |> String.concat ", "
+        raise (ArgumentException $"Could not find config (searched {searched}).")
 
 let printMessage (msg: MailKit.IMessageSummary) =
     let sep = "; "
@@ -88,7 +117,9 @@ let main args =
 
     let options = args |> List.ofSeq |> parseCommandLine defaultOptions
 
-    let config = Config.read options.config
+    let projectName = Path.GetFileNameWithoutExtension(Environment.GetCommandLineArgs()[0]).ToLower()
+    let configPath = findConfigPath projectName options.config
+    let config = Config.read configPath
 
     match options with
     | { daemonize = true; since = date } -> runAsDaemon config date

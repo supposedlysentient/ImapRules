@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <NoWarn>NU1903</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="BuildHelpers.fs" />

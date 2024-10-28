@@ -1,0 +1,7 @@
+{
+    "server": "mail.example.com",
+    "port": 993,
+    "ssl": "auto",
+    "username": "some_user",
+    "password": "hunter2"
+}

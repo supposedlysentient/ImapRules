@@ -9,10 +9,10 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/Core/bin/Debug/net8.0/Core",
+            "program": "${workspaceFolder}/src/Core/bin/Debug/net8.0/ImapRules",
             "args": [
                 "--config",
-                "${workspaceFolder}/scratch/server.json",
+                "${workspaceFolder}/src/Core/config.json",
                 "--daemonize"
             ],
             "cwd": "${workspaceFolder}",

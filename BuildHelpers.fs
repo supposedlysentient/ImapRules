@@ -77,6 +77,8 @@ let createProcess exe args dir =
 
 let dotnet args dir = createProcess "dotnet" args dir
 
+let docker args dir = createProcess "docker" args dir
+
 let run proc arg dir = proc arg dir |> Proc.run |> ignore
 
 let runParallel processes =
@@ -85,9 +87,13 @@ let runParallel processes =
 let runOrDefault args =
     try
         match args with
-        | [| target |] -> Target.runOrDefault target
-        | _ -> Target.runOrDefault "Run"
-
+        | [||] -> Target.runOrDefault "Run"
+        | _ ->
+            let target = Array.head args
+            args
+            |> Array.skip 1
+            |> List.ofArray
+            |> Target.run 1 target
         0
     with e ->
         printfn "%A" e
