@@ -17,7 +17,9 @@ type CommandLineOptions = {
 }
 
 let defaultOptions = {
-    config = "config.json"
+    config = Path.Combine(
+        $"""{Environment.GetEnvironmentVariable("IMAPRULES_CONFIG")}""",
+        "config.json")
     daemonize = false
     fetch = None
     since = None
@@ -41,8 +43,8 @@ let findConfigPath projectName providedPath =
                     |> Array.filter (fun (path: string) -> path.Length > 0)
 
                 yield "/etc/"
-            }
-            |> Seq.map (fun basePath -> Path.Combine(basePath, projectName, providedPath))
+            } |> Seq.map (
+                fun basePath -> Path.Combine(basePath, projectName, providedPath))
         }
 
     try
@@ -50,8 +52,9 @@ let findConfigPath projectName providedPath =
         |> Seq.filter Path.Exists
         |> Seq.head
     with e when e.Message.StartsWith("The input sequence was empty") ->
-        let searched = configPaths |> String.concat ", "
-        raise (ArgumentException $"Could not find config (searched {searched}).")
+        // don't need to fail here, as necessary config might be provided by env vars
+        configPaths
+        |> Seq.head
 
 let printMessage (msg: MailKit.IMessageSummary) =
     let sep = "; "

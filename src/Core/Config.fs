@@ -2,7 +2,6 @@ module Config
 
 open System
 open System.IO
-open Thoth.Json.Net
 
 type SslOptions = MailKit.Security.SecureSocketOptions
 
@@ -26,6 +25,8 @@ type Config = {
     verbosity: Stream
 }
 
+exception ConfigError of Message: string
+
 let defaults = {|
     port = 993
     portInsecure = 143
@@ -39,17 +40,11 @@ let defaults = {|
 |}
 
 module private Config =
+    open Newtonsoft.Json
     open Newtonsoft.Json.Linq
 
-    module Helpers = Decode.Helpers
-
-    type LogPath =
-        | Off
-        | Default
-        | Path of string
-
     type JsonConfig = {
-        server: string
+        server: string option
         port: int option
         ssl: SslOptions option
         username: string option
@@ -57,78 +52,92 @@ module private Config =
         credential_path: string option
         rule_path: string list option
         checkpoint_path: string option
-        log_path: LogPath
+        log_path: string option
         log_console: bool option
         verbosity: Stream option
     }
 
-    let enumDecoder<'T when 'T : struct and 'T :> Enum and 'T : (new: unit -> 'T)> : Decoder<'T> =
-        fun path token ->
-            try
-                let raw =
-                    if Helpers.isNumber token then
-                        Helpers.asInt token |> string
-                    else
-                        Helpers.asString token
-                Enum.Parse (typeof<'T>, raw, true) :?> 'T |> Ok
-            with _ ->
-                let allValues: 'T array = 'T.GetValues ()
-                let msgPart =
-                    allValues
-                    |> Array.map (fun v -> v.ToString ())
-                    |> String.concat (", ")
+    let readEnvToTokenOrNull (field: string) : JToken =
+        let envVar = $"IMAPRULES_{field.ToUpper()}"
+        let envVal = Environment.GetEnvironmentVariable envVar
+        match envVal with
+        | null
+        | "" -> null
+        | _ -> JToken.Parse $"\"{envVal}\"" // future parsing is quite catholic, ints will be fine
 
-                Error (path, BadPrimitiveExtra (nameof<'T>, token, $"Expecting one of {allValues}"))
+    let parseEnum<'T> (token: JToken) : 'T =
+        let stringValue = token.Value<string>()
+        let success, value = Enum.TryParse (typeof<'T>, stringValue, true)
+        if success then
+            value :?> 'T
+        else
+            let expected =
+                Enum.GetValues (typeof<'T>) :?> 'T array
+                |> Array.map (fun v -> v.ToString().ToLower())
+                |> String.concat (" | ")
+            $"expected ( {expected} ) but got '{stringValue}'" |> ConfigError |> raise
 
-    let stringOrStringListDecoder: Decoder<string list> =
-        fun path token ->
-            if Helpers.isArray token then
-                Helpers.asArray token
-                |> Array.map (fun token -> Decode.string path token)
-                |> Array.fold
-                    (fun state res ->
-                        match state, res with
-                        | Ok prevResults, Ok res -> Ok (prevResults @ [ res ])
-                        | Ok _, Error e
-                        | Error e, _ -> Error e)
-                    (Ok [])
-            else
-                [ Helpers.asString token ] |> Ok
+    let parseToken (token: JToken) : 'T =
+        token.Value<'T>()
 
-    let logPathDecoder fieldName =
-        fun path token ->
-            match Helpers.getField fieldName token with
-            | null -> Ok Default
-            | token when token.Type = JTokenType.Null -> Ok Off
-            | token when token.Type = JTokenType.String ->
-                let path = Helpers.asString token
-                if path = "" then Off else Path path
-                |> Ok
-            | token when token.Type = JTokenType.Boolean && token.Value<bool>() = false -> Ok Off
-            | token -> Error (path, BadPrimitive ("a non-empty string or (null|false|empty string)", token))
+    let parseTokenAsList (token: JToken) : 'T list =
+        token.Value<JArray>()
+        |> Seq.map (fun token -> token.Value<'T>())
+        |> List.ofSeq
 
-    let decoder: Decoder<JsonConfig> =
-        Decode.object (fun get -> {
-            server = get.Required.Field "server" Decode.string
-            port = get.Optional.Field "port" Decode.int
-            ssl = get.Optional.Field "ssl" enumDecoder<SslOptions>
-            username = get.Optional.Field "username" Decode.string
-            password = get.Optional.Field "password" Decode.string
-            credential_path = get.Optional.Field "credential_path" Decode.string
-            rule_path = get.Optional.Field "rule_path" stringOrStringListDecoder
-            checkpoint_path = get.Optional.Field "checkpoint_path" Decode.string
-            log_path = get.Required.Raw (logPathDecoder "log_path")
-            log_console = get.Optional.Field "log_console" Decode.bool
-            verbosity = get.Optional.Field "verbosity" enumDecoder<Stream>
-        })
+    let parseList (token: JToken) : 'T list =
+        if token.Type = JTokenType.Array then
+            parseTokenAsList token
+        else
+            [ parseToken token ]
 
-let read (path: string) : Config =
-    let json = File.ReadAllText (path)
+    let readField (root: JToken) (field: string) : Option<JToken> =
+        match root.Item(field) with
+        | null -> readEnvToTokenOrNull field
+        | token -> token
+        |> Option.ofObj
 
-    let config =
-        match Decode.fromString Config.decoder json with
-        | Error e -> failwith e
-        | Ok c -> c
+    let parse json =
+        let serializer = JsonSerializer.Create()
+        let reader = new JsonTextReader(new StringReader(json))
+        let parsedJson = serializer.Deserialize<JToken>(reader)
+
+        let read field =
+            readField parsedJson field
+            |> Option.map parseToken
+        let readEnum field =
+            readField parsedJson field
+            |> Option.map parseEnum
+        let readList field =
+            readField parsedJson field
+            |> Option.map parseList
+
+        {
+            server = read "server"
+            port = read "port"
+            ssl = readEnum "ssl"
+            username = read "username"
+            password = read "password"
+            credential_path = read "credential_path"
+            rule_path = readList "rule_path" // string or list
+            checkpoint_path = read "checkpoint_path"
+            log_path = read "log_path"
+            log_console = read "log_console"
+            verbosity = readEnum "verbosity"
+        }
+
+
+let read (path: string) =
+    // It's possible that all config is passed in env vars
+    let json = if Path.Exists path then File.ReadAllText (path) else "{}"
+
+    let config = Config.parse json
+
+    let server =
+        match config.server with
+        | Some s -> s
+        | Some ""
+        | None -> $"Missing config: 'server'. Checked {path} and ${{IMAPRULES_SERVER}}." |> ConfigError |> raise
 
     let port, sslOptions =
         match config.port, config.ssl with
@@ -142,23 +151,21 @@ let read (path: string) : Config =
     let checkpoint = defaultArg config.checkpoint_path (Path.Combine (basePath, defaults.checkpointPath))
     let logPath =
         match config.log_path with
-        | Config.LogPath.Path p -> Path.Combine (basePath, p) |> Some
-        | Config.LogPath.Default -> Path.Combine (basePath, defaults.logPath) |> Some
-        | Config.LogPath.Off -> None
+        | Some "" -> None
+        | Some path -> Path.Combine (basePath, path) |> Some
+        | None -> Path.Combine (basePath, defaults.logPath) |> Some
 
     let rulePaths =
         match config.rule_path with
         | None -> defaults.rulePath
-        | Some path -> path
-        |> List.map (fun path -> Directory.GetFiles (basePath, path))
-        |> Array.concat
-        |> List.ofArray
+        | Some paths -> paths
+        |> List.map (fun path -> Path.Combine (basePath, path))
 
     let readCred path =
         let lines = File.ReadAllLines(path) |> Array.filter (
             fun s -> s.Length > 0 && not (s.TrimStart().StartsWith('#')))
         if lines.Length <> 2 then
-            failwith $"Credentials at {path} should contain username and password on separate lines"
+            $"Credentials at {path} should contain username and password on separate lines" |> ConfigError |> raise
         System.Net.NetworkCredential (lines[0], lines[1])
 
     let cred =
@@ -173,9 +180,10 @@ let read (path: string) : Config =
             if File.Exists path then
                 readCred path
             else
-                failwith "No credentials supplied"
+                "No credentials supplied" |> ConfigError |> raise
+
     {
-        server = config.server
+        server = server
         port = port
         sslOptions = sslOptions
         credential = cred

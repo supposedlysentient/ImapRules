@@ -8,4 +8,4 @@ nuget Farmer
 nuget Foq
 nuget FSharp.Core
 nuget Mailkit
-nuget Thoth.Json.Net
+nuget Newtonsoft.Json

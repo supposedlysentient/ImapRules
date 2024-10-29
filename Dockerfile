@@ -38,4 +38,17 @@ LABEL org.opencontainers.image.authors="imaprules@sckr.link" \
       org.opencontainers.image.vendor="Freddie Sackur" \
       org.opencontainers.image.version="${VERSION}"
 
+ENV IMAPRULES_CONFIG="/etc/imaprules/config.json" \
+    IMAPRULES_SERVER="" \
+    IMAPRULES_PORT="" \
+    IMAPRULES_SSL="" \
+    IMAPRULES_USERNAME="" \
+    IMAPRULES_PASSWORD="" \
+    IMAPRULES_CREDENTIAL_PATH="" \
+    IMAPRULES_RULE_PATH="" \
+    IMAPRULES_CHECKPOINT_PATH="" \
+    IMAPRULES_LOG_PATH="" \
+    IMAPRULES_LOG_CONSOLE="" \
+    IMAPRULES_VERBOSITY=""
+
 CMD [ "imaprules", "--daemonize" ]
