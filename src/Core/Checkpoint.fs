@@ -7,7 +7,28 @@ type ICheckpoint =
     abstract member Write: uint -> unit
     inherit System.IDisposable
 
-type Checkpoint (path: string) =
+let sanitiseFilename (name: string) =
+    if System.String.IsNullOrWhiteSpace name then
+        failwith "Filename is empty or whitespace"
+
+    let fileChars = Set " !#$%&()+-.0123456789<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_abcdefghijklmnopqrstuvwxyz{|}~¡¢£¤¥¦µ¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ"
+
+    System.Text.Encoding.ASCII.GetBytes name
+    |> Seq.map char
+    |> Seq.map (
+        function
+        | '\\'
+        | '/' -> '_'
+        | c when fileChars.Contains c -> c
+        | _ -> '?')
+    |> Array.ofSeq
+    |> System.String
+
+type Checkpoint (basePath: string, name: string, validity: uint) =
+    do Directory.CreateDirectory basePath |> ignore
+    let name = sanitiseFilename name
+    let path = Path.Combine (basePath, $"{name}_{validity}")
+
     let mutable stream: Stream option = None
     member private this.Stream =
         match stream with

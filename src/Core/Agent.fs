@@ -17,11 +17,21 @@ type Agent (
     config: Config,
     ?logger: ILogger,
     ?client: IClient,
-    ?checkpoint: ICheckpoint) =
+    ?checkpointMaker: string -> uint -> ICheckpoint) =
 
     let logger = defaultArg logger (makeLogger config)
     let client = defaultArg client (new Client (config, logger))
-    let checkpoint = defaultArg checkpoint (new Checkpoint (config.checkpointPath))
+    let checkpointMaker = defaultArg checkpointMaker (
+        fun name validity -> new Checkpoint (config.checkpointPath, name, validity))
+
+    let mutable _checkpoint: ICheckpoint option = None
+    member private this.checkpoint: ICheckpoint =
+        match _checkpoint with
+        | Some checkpoint -> checkpoint
+        | None ->
+            let checkpoint = checkpointMaker "INBOX" client.UidValidity
+            _checkpoint <- Some checkpoint
+            checkpoint
 
     member this.Fetch count =
         let next = client.UidNext.Id
@@ -46,7 +56,7 @@ type Agent (
         this.GetUidsSince date |> this.Fetch
 
     member this.GetUidsSinceCheckpoint () =
-        let id = checkpoint.Read ()
+        let id = this.checkpoint.Read ()
         logger.Log Stream.Info $"Read checkpoint uid: {id}"
         let nextId = client.UidNext.Id
         let uids =
@@ -79,8 +89,8 @@ type Agent (
             logger.Log Stream.Info $"Stopping processing rules: {repr}"
             raise StopProcessing
 
-    member this.Checkpoint (uid: UniqueId) =
-        checkpoint.Write uid.Id
+    member this.WriteCheckpoint (uid: UniqueId) =
+        this.checkpoint.Write uid.Id
 
     interface System.IDisposable with
         member this.Dispose () =
