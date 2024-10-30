@@ -127,6 +127,9 @@ module Fetch =
 
     let uids = makeUids [ 1 ]
     let msgs = uids |> makeMsgs
+    let checkpoint = makeCheckpoint uidNext
+    let checkpointMaker = makeCheckpointMaker checkpoint
+
     let makeClient msgs =
         Mocks.Agent.makeClient msgs uids uidNext
 
@@ -135,10 +138,10 @@ module Fetch =
             config,
             makeLogger (),
             makeClient msgs,
-            makeCheckpoint uidNext
+            checkpointMaker
         )
 
-    let date = System.DateTimeOffset.Parse("1999-12-31T23:59Z")
+    let date = System.DateTimeOffset.Parse "1999-12-31T23:59Z"
 
     type Fixture = {
         uids: UniqueId list
@@ -146,6 +149,7 @@ module Fetch =
         logger: Logging.ILogger
         client: Client.IClient
         checkpoint: Checkpoint.ICheckpoint
+        checkpointMaker: string -> uint -> Checkpoint.ICheckpoint
         agent: Agent
     }
 
@@ -154,14 +158,14 @@ module Fetch =
         let msgs = uids |> makeMsgs
         let logger = makeLogger ()
         let client = makeClient msgs
-        let cp = makeCheckpoint uidNext
         {
             uids = uids
             msgs = msgs
             logger = logger
             client = client
-            checkpoint = cp
-            agent = new Agent(config, logger, client, cp)
+            checkpoint = checkpoint
+            checkpointMaker = checkpointMaker
+            agent = new Agent(config, logger, client, checkpointMaker)
         }
 
 
@@ -200,6 +204,10 @@ module Fetch =
                 let fixture = setup [ 1 .. 3 ]
                 let actual = fixture.agent.FetchSinceCheckpoint ()
                 Expect.equal actual fixture.msgs $"should fetch messages"
+
+                Expect.equal checkpointMakerCalls.Length 1 $"should call checkpointMaker once"
+                Expect.equal checkpointMakerCalls.[0] ("INBOX", inboxValidity) $"should call checkpointMaker once"
+
                 Mock.Verify(<@ fixture.checkpoint.Read () @>, Times.Once)
             }
         ]

@@ -31,7 +31,7 @@ let run (config: Config) (rules: Command list) (date: System.DateTimeOffset opti
         msgs
         |> List.sortBy (fun msg -> msg.UniqueId.Id) // for checkpoint reasons
         |> List.iter (fun msg ->
-            agent.Checkpoint msg.UniqueId
+            agent.WriteCheckpoint msg.UniqueId
             processMessage agent rules msg)
 
         let uids' =

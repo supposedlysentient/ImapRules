@@ -54,7 +54,15 @@ module Agent =
             .Setup(fun c -> <@ c.UidValidity @>).Returns(inboxValidity)
             .Create()
 
+    let mutable checkpointMakerCalls : list<string * uint> = []
+
     let makeCheckpoint (uidNext: UniqueId) =
         Mock<ICheckpoint>()
             .SetupMethod(fun cp -> <@ cp.Read @>).Returns(uidNext.Id)
             .Create()
+
+    let makeCheckpointMaker (cp: ICheckpoint) =
+        checkpointMakerCalls <- []
+        fun name validity ->
+            checkpointMakerCalls <- checkpointMakerCalls @ [(name, validity)]
+            cp
