@@ -117,14 +117,14 @@ module Docker =
 
         static member defaults =
             {
-                authors = "imaprules@sckr.link"
+                authors = "Freddie Sackur"
                 description = "IMAP agent that connects to your mailbox and runs mail rules."
-                documentation = "https://github.com/fsackur/ImapRules/README.md"
-                licenses = "https://github.com/fsackur/ImapRules/LICENSE"
-                source = "https://github.com/fsackur/ImapRules/"
+                documentation = "https://github.com/supposedlysentient/ImapRules/"
+                licenses = "https://raw.githubusercontent.com/supposedlysentient/ImapRules/refs/heads/main/LICENSE"
+                source = "https://github.com/supposedlysentient/ImapRules/"
                 title = "ImapRules"
-                url = "https://github.com/fsackur/ImapRules/"
-                vendor = "Freddie Sackur"
+                url = "https://github.com/supposedlysentient/ImapRules/"
+                vendor = "Supposedly Sentient"
                 version = ""
             }
 
