@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://github.com/fsackur/ImapRules/config.schema.json",
+    "$id": "https://raw.githubusercontent.com/supposedlysentient/ImapRules/refs/heads/main/config.schema.json",
     "title": "Config",
     "description": "Configuration file for ImapRules",
     "type": "object",
