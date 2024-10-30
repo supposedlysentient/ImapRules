@@ -17,29 +17,8 @@ RUN dotnet run buildRelease
 
 FROM mcr.microsoft.com/dotnet/runtime:8.0-bookworm-slim
 
-COPY --from=build /ImapRules/Release/ /usr/bin/ImapRules/
-
-RUN ln -s /usr/bin/ImapRules/ImapRules /usr/bin/imaprules
-
-RUN mkdir /etc/imaprules && \
-    mv /usr/bin/ImapRules/config.json /etc/imaprules/
-
-WORKDIR /etc/imaprules
-VOLUME /etc/imaprules
-
-ARG VERSION=""
-LABEL org.opencontainers.image.authors="imaprules@sckr.link" \
-      org.opencontainers.image.description="IMAP agent that connects to your mailbox and runs mail rules." \
-      org.opencontainers.image.documentation="https://github.com/fsackur/ImapRules/README.md" \
-      org.opencontainers.image.licenses="https://github.com/fsackur/ImapRules/LICENSE" \
-      org.opencontainers.image.source="https://github.com/fsackur/ImapRules/" \
-      org.opencontainers.image.title="ImapRules" \
-      org.opencontainers.image.url="https://github.com/fsackur/ImapRules/" \
-      org.opencontainers.image.vendor="Freddie Sackur" \
-      org.opencontainers.image.version="${VERSION}"
-
-ENV IMAPRULES_CONFIG="/etc/imaprules/config.json" \
-    IMAPRULES_SERVER="" \
+# TODO: validate this matches JsonConfig
+ENV IMAPRULES_SERVER="" \
     IMAPRULES_PORT="" \
     IMAPRULES_SSL="" \
     IMAPRULES_USERNAME="" \
@@ -50,5 +29,16 @@ ENV IMAPRULES_CONFIG="/etc/imaprules/config.json" \
     IMAPRULES_LOG_PATH="" \
     IMAPRULES_LOG_CONSOLE="" \
     IMAPRULES_VERBOSITY=""
+
+COPY --from=build /ImapRules/Release/ /usr/bin/ImapRules/
+
+RUN ln -s /usr/bin/ImapRules/ImapRules /usr/bin/imaprules
+
+ENV IMAPRULES_CONFIG="/etc/imaprules/config.json"
+RUN mkdir /etc/imaprules && \
+    mv /usr/bin/ImapRules/config.json ${IMAPRULES_CONFIG}
+
+WORKDIR /etc/imaprules
+VOLUME /etc/imaprules
 
 CMD [ "imaprules", "--daemonize" ]

@@ -18,8 +18,24 @@ Target.create "buildRelease" (fun _ -> run dotnet [ "publish"; "-c"; "Release"; 
 
 Target.create "buildDocker" (
     fun param ->
-        let args = "build" :: param.Context.Arguments @ [ projectRoot ]
-        run docker args projectRoot)
+        let args = param.Context.Arguments
+        let version =
+            args
+            |> List.pairwise
+            |> List.fold (fun version args ->
+                match args with
+                | ("--version", version') -> version'
+                | ("--build-arg", version') when version'.StartsWith("VERSION=") ->
+                    if version <> "" then version else
+                        version'.Replace("VERSION=", "", ignoreCase)
+                | _ -> version) ""
+
+        if version <> "" then Docker.validateSemVer version
+
+        let ociLabelArgs = Docker.OciLabels.ofVersion version |> Docker.toDockerArgs
+        let dockerArgs = "build" :: args @ ociLabelArgs @ [ projectRoot ]
+
+        run docker dockerArgs projectRoot)
 
 Target.create "run" (fun _ -> run dotnet [ "build" ] srcPath)
 

@@ -98,3 +98,53 @@ let runOrDefault args =
     with e ->
         printfn "%A" e
         1
+
+let ignoreCase = System.StringComparison.OrdinalIgnoreCase
+
+module Docker =
+    type OciLabels =
+        {
+            authors: string
+            description: string
+            documentation: string
+            licenses: string
+            source: string
+            title: string
+            url: string
+            vendor: string
+            version: string
+        }
+
+        static member defaults =
+            {
+                authors = "imaprules@sckr.link"
+                description = "IMAP agent that connects to your mailbox and runs mail rules."
+                documentation = "https://github.com/fsackur/ImapRules/README.md"
+                licenses = "https://github.com/fsackur/ImapRules/LICENSE"
+                source = "https://github.com/fsackur/ImapRules/"
+                title = "ImapRules"
+                url = "https://github.com/fsackur/ImapRules/"
+                vendor = "Freddie Sackur"
+                version = ""
+            }
+
+        static member ofVersion (version: string) =
+            { OciLabels.defaults with version = version }
+
+    open FSharp.Reflection
+
+    let toDockerArgs (labels: OciLabels) =
+        FSharpType.GetRecordFields (labels.GetType())
+        |> Array.map (fun pi -> [|
+            let value = pi.GetValue labels
+            "--label"
+            $"org.opencontainers.image.{pi.Name}=\"{value}\"" |])
+        |> Array.concat
+        |> List.ofArray
+
+    open System
+
+    let validateSemVer (version: string) =
+        let success, version' = Version.TryParse (version.Replace("v", "", ignoreCase))
+        if not success || version'.Revision <> -1 || version'.Build = -1 then
+            failwith $"Failed to parse version: '{version}'"
